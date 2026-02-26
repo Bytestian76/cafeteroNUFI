@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+{% block title %}Inventario · El Cafetero de Nufi{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="fw-bold"><i class="bi bi-box-seam"></i> Inventario</h3>
+    {% if current_user.rol in ['admin', 'operario'] %}
+    <a href="{{ url_for('inventario.nuevo') }}" class="btn btn-success">
+        <i class="bi bi-plus-lg"></i> Nuevo Elemento
+    </a>
+    {% endif %}
+</div>
+
+<!-- Filtro por categoría -->
+<form method="GET" class="mb-4">
+    <div class="row g-2 align-items-center">
+        <div class="col-auto">
+            <label class="col-form-label fw-semibold">Filtrar por categoría:</label>
+        </div>
+        <div class="col-auto">
+            <select name="categoria" class="form-select" onchange="this.form.submit()">
+                <option value="">Todas</option>
+                <option value="insumo" {{ 'selected' if categoria=='insumo' }}>Insumo</option>
+                <option value="maquinaria" {{ 'selected' if categoria=='maquinaria' }}>Maquinaria</option>
+                <option value="herramienta" {{ 'selected' if categoria=='herramienta' }}>Herramienta</option>
+                <option value="material" {{ 'selected' if categoria=='material' }}>Material</option>
+            </select>
+        </div>
+        {% if categoria %}
+        <div class="col-auto">
+            <a href="{{ url_for('inventario.listar') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-x"></i> Limpiar filtro
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</form>
+
+<!-- Tabla de inventario -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead class="table-success">
+                <tr>
+                    <th>#</th>
+                    <th>Nombre</th>
+                    <th>Categoría</th>
+                    <th>Stock Actual</th>
+                    <th>Stock Mínimo</th>
+                    <th>Unidad</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in elementos %}
+                <tr>
+                    <td>{{ e.id }}</td>
+                    <td>
+                        {{ e.nombre }}
+                        {% if e.tiene_alerta() %}
+                        <span class="badge bg-danger ms-1">
+                            <i class="bi bi-exclamation-triangle"></i> Escasez
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge bg-secondary">{{ e.categoria }}</span>
+                    </td>
+                    <td class="{{ 'text-danger fw-bold' if e.tiene_alerta() }}">
+                        {{ e.stock_actual }} {{ e.unidad_medida }}
+                    </td>
+                    <td>{{ e.stock_minimo }} {{ e.unidad_medida }}</td>
+                    <td>{{ e.unidad_medida }}</td>
+                    <td><span class="badge bg-success">Activo</span></td>
+                    <td>
+                        {% if current_user.rol in ['admin', 'operario'] %}
+                        <a href="{{ url_for('inventario.editar', id=e.id) }}" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <form method="POST" action="{{ url_for('inventario.desactivar', id=e.id) }}" class="d-inline"
+                            onsubmit="return confirm('¿Desactivar {{ e.nombre }}?')">
+                            <button class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="text-center text-muted py-4">
+                        No hay elementos en el inventario.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

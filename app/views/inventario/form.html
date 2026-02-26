@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'Editar' if elemento else 'Nuevo' }} Elemento · El Cafetero de Nufi{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+
+        <div class="d-flex align-items-center mb-4">
+            <a href="{{ url_for('inventario.listar') }}" class="btn btn-outline-secondary btn-sm me-3">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+            <h3 class="fw-bold mb-0">
+                {{ 'Editar Elemento' if elemento else 'Nuevo Elemento' }}
+            </h3>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <form method="POST">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Nombre</label>
+                        <input type="text" name="nombre" class="form-control"
+                            value="{{ elemento.nombre if elemento else '' }}" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Categoría</label>
+                        <select name="categoria" class="form-select" required>
+                            <option value="">Seleccionar...</option>
+                            <option value="insumo" {{ 'selected' if elemento and elemento.categoria=='insumo' }}>
+                                Insumo
+                            </option>
+                            <option value="maquinaria" {{ 'selected' if elemento and elemento.categoria=='maquinaria'
+                                }}>
+                                Maquinaria
+                            </option>
+                            <option value="herramienta" {{ 'selected' if elemento and elemento.categoria=='herramienta'
+                                }}>
+                                Herramienta
+                            </option>
+                            <option value="material" {{ 'selected' if elemento and elemento.categoria=='material' }}>
+                                Material
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">Stock Actual</label>
+                            <input type="number" name="stock_actual" class="form-control" step="0.01" min="0"
+                                value="{{ elemento.stock_actual if elemento else '0' }}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">Stock Mínimo</label>
+                            <input type="number" name="stock_minimo" class="form-control" step="0.01" min="0"
+                                value="{{ elemento.stock_minimo if elemento else '0' }}" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">Unidad de Medida</label>
+                        <input type="text" name="unidad_medida" class="form-control"
+                            placeholder="kg, litros, unidades, etc."
+                            value="{{ elemento.unidad_medida if elemento else '' }}" required>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-lg"></i>
+                            {{ 'Guardar cambios' if elemento else 'Registrar elemento' }}
+                        </button>
+                    </div>
+
+                </form>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
