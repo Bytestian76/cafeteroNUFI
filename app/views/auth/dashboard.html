@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard · El Cafetero de Nufi{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="fw-bold">
+        <i class="bi bi-speedometer2"></i> Dashboard
+    </h3>
+    <span class="text-muted">Bienvenido, <strong>{{ current_user.nombre }}</strong></span>
+</div>
+
+<div class="row g-4">
+
+    {% if current_user.rol in ['admin', 'operario'] %}
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center p-4">
+                <i class="bi bi-box-seam fs-1 text-success"></i>
+                <h5 class="mt-2">Inventario</h5>
+                <p class="text-muted small">Gestiona elementos, stock y categorías</p>
+                <a href="#" class="btn btn-outline-success btn-sm">Ver inventario</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center p-4">
+                <i class="bi bi-arrow-left-right fs-1 text-primary"></i>
+                <h5 class="mt-2">Movimientos</h5>
+                <p class="text-muted small">Registra entradas y salidas</p>
+                <a href="#" class="btn btn-outline-primary btn-sm">Ver movimientos</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center p-4">
+                <i class="bi bi-cart3 fs-1 text-warning"></i>
+                <h5 class="mt-2">Ventas</h5>
+                <p class="text-muted small">Clientes, facturas y totales</p>
+                <a href="#" class="btn btn-outline-warning btn-sm">Ver ventas</a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if current_user.rol in ['admin', 'consultor'] %}
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center p-4">
+                <i class="bi bi-bar-chart-line fs-1 text-info"></i>
+                <h5 class="mt-2">Reportes</h5>
+                <p class="text-muted small">Inventario, movimientos y ventas</p>
+                <a href="#" class="btn btn-outline-info btn-sm">Ver reportes</a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if current_user.rol == 'admin' %}
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center p-4">
+                <i class="bi bi-people fs-1 text-danger"></i>
+                <h5 class="mt-2">Usuarios</h5>
+                <p class="text-muted small">Gestión de accesos y roles</p>
+                <a href="{{ url_for('auth.listar_usuarios') }}" class="btn btn-outline-danger btn-sm">Ver usuarios</a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

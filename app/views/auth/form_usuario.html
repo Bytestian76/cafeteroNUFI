@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'Editar' if usuario else 'Nuevo' }} Usuario · El Cafetero de Nufi{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+
+        <div class="d-flex align-items-center mb-4">
+            <a href="{{ url_for('auth.listar_usuarios') }}" class="btn btn-outline-secondary btn-sm me-3">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+            <h3 class="fw-bold mb-0">
+                {{ 'Editar Usuario' if usuario else 'Nuevo Usuario' }}
+            </h3>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <form method="POST">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Nombre completo</label>
+                        <input type="text" name="nombre" class="form-control"
+                               value="{{ usuario.nombre if usuario else '' }}" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Correo electrónico</label>
+                        <input type="email" name="email" class="form-control"
+                               value="{{ usuario.email if usuario else '' }}" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">
+                            Contraseña
+                            {% if usuario %}
+                                <small class="text-muted fw-normal">(dejar vacío para no cambiar)</small>
+                            {% endif %}
+                        </label>
+                        <input type="password" name="password" class="form-control"
+                               {{ 'required' if not usuario else '' }}>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">Rol</label>
+                        <select name="rol" class="form-select" required>
+                            <option value="operario"
+                                {{ 'selected' if usuario and usuario.rol == 'operario' }}>
+                                Operario
+                            </option>
+                            <option value="consultor"
+                                {{ 'selected' if usuario and usuario.rol == 'consultor' }}>
+                                Consultor
+                            </option>
+                            <option value="admin"
+                                {{ 'selected' if usuario and usuario.rol == 'admin' }}>
+                                Admin
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-lg"></i>
+                            {{ 'Guardar cambios' if usuario else 'Crear usuario' }}
+                        </button>
+                    </div>
+
+                </form>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

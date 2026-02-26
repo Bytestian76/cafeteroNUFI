@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% block title %}Usuarios · El Cafetero de Nufi{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="fw-bold"><i class="bi bi-people"></i> Gestión de Usuarios</h3>
+    <a href="{{ url_for('auth.nuevo_usuario') }}" class="btn btn-success">
+        <i class="bi bi-plus-lg"></i> Nuevo Usuario
+    </a>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead class="table-success">
+                <tr>
+                    <th>#</th>
+                    <th>Nombre</th>
+                    <th>Correo</th>
+                    <th>Rol</th>
+                    <th>Estado</th>
+                    <th>Creado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in usuarios %}
+                <tr class="{% if not u.activo %}table-secondary text-muted{% endif %}">
+                    <td>{{ u.id }}</td>
+                    <td>{{ u.nombre }}</td>
+                    <td>{{ u.email }}</td>
+                    <td>
+                        {% if u.rol == 'admin' %}
+                            <span class="badge bg-danger">admin</span>
+                        {% elif u.rol == 'operario' %}
+                            <span class="badge bg-primary">operario</span>
+                        {% else %}
+                            <span class="badge bg-secondary">consultor</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if u.activo %}
+                            <span class="badge bg-success">Activo</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Inactivo</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ u.created_at.strftime('%d/%m/%Y') if u.created_at else '—' }}</td>
+                    <td>
+                        <a href="{{ url_for('auth.editar_usuario', id=u.id) }}"
+                           class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        {% if u.activo and u.id != current_user.id %}
+                        <form method="POST"
+                              action="{{ url_for('auth.desactivar_usuario', id=u.id) }}"
+                              class="d-inline"
+                              onsubmit="return confirm('¿Desactivar a {{ u.nombre }}?')">
+                            <button class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-person-x"></i>
+                            </button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">No hay usuarios registrados.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
