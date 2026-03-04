@@ -12,7 +12,7 @@ class ElementoInventario(db.Model):
     activo         = db.Column(db.Boolean, default=True)
 
     # Relación con movimientos (se usará en Sprint III)
-    movimientos = db.relationship('Movimiento', backref='elemento', lazy=True)
+    
 
     def tiene_alerta(self):
         """Retorna True si el stock actual está en nivel de escasez."""
