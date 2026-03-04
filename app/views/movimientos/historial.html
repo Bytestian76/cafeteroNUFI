@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% block title %}Movimientos · El Cafetero de Nufi{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="fw-bold"><i class="bi bi-arrow-left-right"></i> Historial de Movimientos</h3>
+    {% if current_user.rol in ['admin', 'operario'] %}
+    <a href="{{ url_for('movimientos.nuevo') }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg"></i> Nuevo Movimiento
+    </a>
+    {% endif %}
+</div>
+
+<!-- Filtros -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <form method="GET">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Elemento</label>
+                    <select name="elemento_id" class="form-select form-select-sm">
+                        <option value="">Todos</option>
+                        {% for e in elementos %}
+                        <option value="{{ e.id }}"
+                            {{ 'selected' if filtros.elemento_id == e.id|string }}>
+                            {{ e.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">Tipo</label>
+                    <select name="tipo" class="form-select form-select-sm">
+                        <option value="">Todos</option>
+                        <option value="entrada" {{ 'selected' if filtros.tipo == 'entrada' }}>Entrada</option>
+                        <option value="salida"  {{ 'selected' if filtros.tipo == 'salida' }}>Salida</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Desde</label>
+                    <input type="date" name="fecha_desde" class="form-control form-control-sm"
+                           value="{{ filtros.fecha_desde }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Hasta</label>
+                    <input type="date" name="fecha_hasta" class="form-control form-control-sm"
+                           value="{{ filtros.fecha_hasta }}">
+                </div>
+                <div class="col-md-1">
+                    <button type="submit" class="btn btn-success btn-sm w-100">
+                        <i class="bi bi-search"></i>
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Tabla -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead class="table-primary">
+                <tr>
+                    <th>#</th>
+                    <th>Elemento</th>
+                    <th>Tipo</th>
+                    <th>Cantidad</th>
+                    <th>Observación</th>
+                    <th>Usuario</th>
+                    <th>Fecha</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in movimientos %}
+                <tr>
+                    <td>{{ m.id }}</td>
+                    <td>{{ m.elemento.nombre }}</td>
+                    <td>
+                        {% if m.tipo == 'entrada' %}
+                            <span class="badge bg-success">📥 Entrada</span>
+                        {% else %}
+                            <span class="badge bg-danger">📤 Salida</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ m.cantidad }} {{ m.elemento.unidad_medida }}</td>
+                    <td>{{ m.observacion or '—' }}</td>
+                    <td>{{ m.usuario.nombre }}</td>
+                    <td>{{ m.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">
+                        No hay movimientos registrados.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

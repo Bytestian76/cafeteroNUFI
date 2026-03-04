@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block title %}Nuevo Movimiento · El Cafetero de Nufi{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+
+        <div class="d-flex align-items-center mb-4">
+            <a href="{{ url_for('movimientos.historial') }}" class="btn btn-outline-secondary btn-sm me-3">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+            <h3 class="fw-bold mb-0">Registrar Movimiento</h3>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <form method="POST">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Elemento del inventario</label>
+                        <select name="elemento_id" class="form-select" required>
+                            <option value="">Seleccionar...</option>
+                            {% for e in elementos %}
+                            <option value="{{ e.id }}">
+                                {{ e.nombre }} — Stock actual: {{ e.stock_actual }} {{ e.unidad_medida }}
+                                {% if e.tiene_alerta() %}⚠️{% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Tipo de movimiento</label>
+                        <select name="tipo" class="form-select" required>
+                            <option value="">Seleccionar...</option>
+                            <option value="entrada">📥 Entrada</option>
+                            <option value="salida">📤 Salida</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Cantidad</label>
+                        <input type="number" name="cantidad" class="form-control"
+                               step="0.01" min="0.01" required>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">Observación <span class="text-muted fw-normal">(opcional)</span></label>
+                        <textarea name="observacion" class="form-control" rows="3"
+                                  placeholder="Motivo o detalle del movimiento..."></textarea>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> Registrar movimiento
+                        </button>
+                    </div>
+
+                </form>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
