@@ -27,8 +27,7 @@
                     <!-- Inventario: admin y operario -->
                     {% if current_user.rol in ['admin', 'operario'] %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('inventario.listar') }}"><i class="bi bi-box-seam"></i>
-                            Inventario</a>
+                        <a class="nav-link" href="/inventario"><i class="bi bi-box-seam"></i> Inventario</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="#"><i class="bi bi-arrow-left-right"></i> Movimientos</a>
