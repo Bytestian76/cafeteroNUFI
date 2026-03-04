@@ -34,5 +34,8 @@ def create_app():
     
     from app.controllers.venta_controller import venta_bp
     app.register_blueprint(venta_bp)
+
+    from app.controllers.producto_controller import producto_bp
+    app.register_blueprint(producto_bp)
     
     return app
