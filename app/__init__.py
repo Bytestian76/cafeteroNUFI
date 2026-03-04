@@ -29,4 +29,7 @@ def create_app():
     from app.controllers.inventario_controller import inventario_bp
     app.register_blueprint(inventario_bp)
 
+    from app.controllers.movimiento_controller import movimiento_bp
+    app.register_blueprint(movimiento_bp)
+    
     return app
