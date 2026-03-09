@@ -9,6 +9,25 @@
     <span class="text-muted">Bienvenido, <strong>{{ current_user.nombre }}</strong></span>
 </div>
 
+<!-- Alertas de escasez -->
+{% if elementos_alerta %}
+<div class="alert alert-danger alert-dismissible fade show mb-4" role="alert">
+    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+    <strong>⚠️ Alerta de escasez:</strong> Los siguientes elementos están por debajo del stock mínimo:
+    <ul class="mb-0 mt-2">
+        {% for e in elementos_alerta %}
+        <li>
+            <strong>{{ e.nombre }}</strong> — Stock actual:
+            <span class="text-danger fw-bold">{{ e.stock_actual }} {{ e.unidad_medida }}</span>
+            (mínimo: {{ e.stock_minimo }} {{ e.unidad_medida }})
+        </li>
+        {% endfor %}
+    </ul>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<!-- Cards de módulos -->
 <div class="row g-4">
 
     {% if current_user.rol in ['admin', 'operario'] %}
@@ -18,7 +37,7 @@
                 <i class="bi bi-box-seam fs-1 text-success"></i>
                 <h5 class="mt-2">Inventario</h5>
                 <p class="text-muted small">Gestiona elementos, stock y categorías</p>
-                <a href="#" class="btn btn-outline-success btn-sm">Ver inventario</a>
+                <a href="{{ url_for('inventario.listar') }}" class="btn btn-outline-success btn-sm">Ver inventario</a>
             </div>
         </div>
     </div>
@@ -29,7 +48,7 @@
                 <i class="bi bi-arrow-left-right fs-1 text-primary"></i>
                 <h5 class="mt-2">Movimientos</h5>
                 <p class="text-muted small">Registra entradas y salidas</p>
-                <a href="#" class="btn btn-outline-primary btn-sm">Ver movimientos</a>
+                <a href="{{ url_for('movimientos.historial') }}" class="btn btn-outline-primary btn-sm">Ver movimientos</a>
             </div>
         </div>
     </div>
@@ -40,7 +59,18 @@
                 <i class="bi bi-cart3 fs-1 text-warning"></i>
                 <h5 class="mt-2">Ventas</h5>
                 <p class="text-muted small">Clientes, facturas y totales</p>
-                <a href="#" class="btn btn-outline-warning btn-sm">Ver ventas</a>
+                <a href="{{ url_for('ventas.listar') }}" class="btn btn-outline-warning btn-sm">Ver ventas</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center p-4">
+                <i class="bi bi-bag fs-1 text-secondary"></i>
+                <h5 class="mt-2">Productos</h5>
+                <p class="text-muted small">Catálogo de productos comercializables</p>
+                <a href="{{ url_for('productos.listar') }}" class="btn btn-outline-secondary btn-sm">Ver productos</a>
             </div>
         </div>
     </div>
@@ -53,7 +83,7 @@
                 <i class="bi bi-bar-chart-line fs-1 text-info"></i>
                 <h5 class="mt-2">Reportes</h5>
                 <p class="text-muted small">Inventario, movimientos y ventas</p>
-                <a href="#" class="btn btn-outline-info btn-sm">Ver reportes</a>
+                <a href="{{ url_for('reportes.inventario') }}" class="btn btn-outline-info btn-sm">Ver reportes</a>
             </div>
         </div>
     </div>

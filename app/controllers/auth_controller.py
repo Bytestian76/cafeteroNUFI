@@ -2,9 +2,13 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_user, logout_user, login_required, current_user
 from app import db, bcrypt
 from app.models.usuario import Usuario
+from app.models.inventario import ElementoInventario
 from app.utils.decorators import rol_requerido
 
 auth_bp = Blueprint('auth', __name__)
+@auth_bp.route('/')
+def index():
+    return redirect(url_for('auth.login'))
 
 
 # ─── LOGIN ───────────────────────────────────────────────────────────────────
@@ -12,9 +16,9 @@ auth_bp = Blueprint('auth', __name__)
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        email = request.form['email']
+        email    = request.form['email']
         password = request.form['password']
-        usuario = Usuario.query.filter_by(email=email, activo=True).first()
+        usuario  = Usuario.query.filter_by(email=email, activo=True).first()
 
         if usuario and bcrypt.check_password_hash(usuario.password_hash, password):
             login_user(usuario)
@@ -38,7 +42,12 @@ def logout():
 @auth_bp.route('/dashboard')
 @login_required
 def dashboard():
-    return render_template('auth/dashboard.html')
+    # Consultar elementos con alerta de escasez para mostrar en el dashboard
+    elementos_alerta = [
+        e for e in ElementoInventario.query.filter_by(activo=True).all()
+        if e.tiene_alerta()
+    ]
+    return render_template('auth/dashboard.html', elementos_alerta=elementos_alerta)
 
 
 # ─── LISTAR USUARIOS (solo admin) ────────────────────────────────────────────
@@ -63,7 +72,6 @@ def nuevo_usuario():
         password = request.form['password']
         rol      = request.form['rol']
 
-        # Verificar que el email no exista
         if Usuario.query.filter_by(email=email).first():
             flash('Ya existe un usuario con ese correo.', 'danger')
             return redirect(url_for('auth.nuevo_usuario'))
@@ -91,7 +99,6 @@ def editar_usuario(id):
         usuario.email  = request.form['email']
         usuario.rol    = request.form['rol']
 
-        # Solo actualiza contraseña si se escribió algo
         nueva_pw = request.form['password']
         if nueva_pw:
             usuario.password_hash = bcrypt.generate_password_hash(nueva_pw).decode('utf-8')
@@ -111,7 +118,6 @@ def editar_usuario(id):
 def desactivar_usuario(id):
     usuario = Usuario.query.get_or_404(id)
 
-    # Evitar que el admin se desactive a sí mismo
     if usuario.id == current_user.id:
         flash('No puedes desactivarte a ti mismo.', 'warning')
         return redirect(url_for('auth.listar_usuarios'))

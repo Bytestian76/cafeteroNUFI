@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+{% block title %}Reporte de Ventas · El Cafetero de Nufi{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="fw-bold"><i class="bi bi-bar-chart-line"></i> Reporte de Ventas</h3>
+</div>
+
+<!-- Filtros -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <form method="GET">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Cliente</label>
+                    <select name="cliente_id" class="form-select form-select-sm">
+                        <option value="">Todos</option>
+                        {% for c in clientes %}
+                        <option value="{{ c.id }}" {{ 'selected' if filtros.cliente_id == c.id|string }}>
+                            {{ c.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">Desde</label>
+                    <input type="date" name="fecha_desde" class="form-control form-control-sm"
+                        value="{{ filtros.fecha_desde }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">Hasta</label>
+                    <input type="date" name="fecha_hasta" class="form-control form-control-sm"
+                        value="{{ filtros.fecha_hasta }}">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-success btn-sm w-100">
+                        <i class="bi bi-search"></i> Filtrar
+                    </button>
+                </div>
+                <div class="col-md-2">
+                    <a href="{{ url_for('reportes.ventas') }}" class="btn btn-outline-secondary btn-sm w-100">
+                        <i class="bi bi-x"></i> Limpiar
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Resumen -->
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm text-center p-3">
+            <div class="fw-bold fs-4">{{ ventas|length }}</div>
+            <div class="text-muted small">Total facturas</div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm text-center p-3">
+            <div class="fw-bold fs-4 text-success">${{ "%.2f"|format(total_general) }}</div>
+            <div class="text-muted small">Total recaudado</div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabla -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead class="table-warning">
+                <tr>
+                    <th>Factura #</th>
+                    <th>Cliente</th>
+                    <th>Productos</th>
+                    <th>Total</th>
+                    <th>Fecha</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for v in ventas %}
+                <tr>
+                    <td><span class="badge bg-warning text-dark">{{ v.id }}</span></td>
+                    <td>{{ v.cliente.nombre }}</td>
+                    <td>
+                        {% for d in v.detalles %}
+                        <small class="badge bg-light text-dark border me-1">
+                            {{ d.producto.nombre }} x{{ d.cantidad }}
+                        </small>
+                        {% endfor %}
+                    </td>
+                    <td class="fw-bold text-success">${{ "%.2f"|format(v.total) }}</td>
+                    <td>{{ v.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted py-4">
+                        No hay ventas que coincidan con los filtros.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

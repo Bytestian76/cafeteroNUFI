@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+{% block title %}Reporte de Inventario · El Cafetero de Nufi{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="fw-bold"><i class="bi bi-bar-chart-line"></i> Reporte de Inventario</h3>
+    <a href="{{ url_for('reportes.inventario_pdf', categoria=categoria, alerta=alerta) }}"
+        class="btn btn-outline-danger">
+        <i class="bi bi-file-earmark-pdf"></i> Exportar PDF
+    </a>
+</div>
+
+<!-- Filtros -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <form method="GET">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Categoría</label>
+                    <select name="categoria" class="form-select form-select-sm">
+                        <option value="">Todas</option>
+                        <option value="insumo"      {{ 'selected' if categoria == 'insumo' }}>Insumo</option>
+                        <option value="maquinaria"  {{ 'selected' if categoria == 'maquinaria' }}>Maquinaria</option>
+                        <option value="herramienta" {{ 'selected' if categoria == 'herramienta' }}>Herramienta</option>
+                        <option value="material"    {{ 'selected' if categoria == 'material' }}>Material</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Estado de alerta</label>
+                    <select name="alerta" class="form-select form-select-sm">
+                        <option value="">Todos</option>
+                        <option value="1" {{ 'selected' if alerta == '1' }}>Solo con escasez</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-success btn-sm w-100">
+                        <i class="bi bi-search"></i> Filtrar
+                    </button>
+                </div>
+                <div class="col-md-2">
+                    <a href="{{ url_for('reportes.inventario') }}" class="btn btn-outline-secondary btn-sm w-100">
+                        <i class="bi bi-x"></i> Limpiar
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Resumen -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm text-center p-3">
+            <div class="fw-bold fs-4">{{ elementos|length }}</div>
+            <div class="text-muted small">Total elementos</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm text-center p-3">
+            <div class="fw-bold fs-4 text-danger">{{ con_escasez }}</div>
+            <div class="text-muted small">Con alerta de escasez</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm text-center p-3">
+            <div class="fw-bold fs-4 text-success">{{ sin_escasez }}</div>
+            <div class="text-muted small">Stock normal</div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabla -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead class="table-success">
+                <tr>
+                    <th>#</th>
+                    <th>Nombre</th>
+                    <th>Categoría</th>
+                    <th>Stock Actual</th>
+                    <th>Stock Mínimo</th>
+                    <th>Unidad</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in elementos %}
+                <tr>
+                    <td>{{ e.id }}</td>
+                    <td>
+                        {{ e.nombre }}
+                        {% if e.tiene_alerta() %}
+                        <span class="badge bg-danger ms-1">
+                            <i class="bi bi-exclamation-triangle"></i> Escasez
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td><span class="badge bg-secondary">{{ e.categoria }}</span></td>
+                    <td class="{{ 'text-danger fw-bold' if e.tiene_alerta() }}">
+                        {{ e.stock_actual }} {{ e.unidad_medida }}
+                    </td>
+                    <td>{{ e.stock_minimo }} {{ e.unidad_medida }}</td>
+                    <td>{{ e.unidad_medida }}</td>
+                    <td>
+                        {% if e.tiene_alerta() %}
+                        <span class="badge bg-danger">⚠️ Escasez</span>
+                        {% else %}
+                        <span class="badge bg-success">Normal</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">
+                        No hay elementos que coincidan con los filtros.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

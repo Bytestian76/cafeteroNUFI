@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block title %}Productos · El Cafetero de Nufi{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="fw-bold"><i class="bi bi-bag"></i> Productos</h3>
+    {% if current_user.rol in ['admin', 'operario'] %}
+    <a href="{{ url_for('productos.nuevo') }}" class="btn btn-success">
+        <i class="bi bi-plus-lg"></i> Nuevo Producto
+    </a>
+    {% endif %}
+</div>
+
+<!-- Tabla de productos -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead class="table-success">
+                <tr>
+                    <th>#</th>
+                    <th>Nombre</th>
+                    <th>Descripción</th>
+                    <th>Precio Unitario</th>
+                    <th>Unidad</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in productos %}
+                <tr>
+                    <td>{{ p.id }}</td>
+                    <td>{{ p.nombre }}</td>
+                    <td class="text-muted small">{{ p.descripcion if p.descripcion else '—' }}</td>
+                    <td>${{ "%.2f"|format(p.precio_unitario) }}</td>
+                    <td>
+                        <span class="badge bg-secondary">{{ p.unidad_medida }}</span>
+                    </td>
+                    <td>
+                        {% if p.activo %}
+                        <span class="badge bg-success">Activo</span>
+                        {% else %}
+                        <span class="badge bg-danger">Inactivo</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if current_user.rol in ['admin', 'operario'] %}
+                        <a href="{{ url_for('productos.editar', id=p.id) }}" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        {% if p.activo %}
+                        <form method="POST" action="{{ url_for('productos.desactivar', id=p.id) }}" class="d-inline"
+                            onsubmit="return confirm('¿Desactivar {{ p.nombre }}?')">
+                            <button class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                        {% endif %}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">
+                        No hay productos registrados.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

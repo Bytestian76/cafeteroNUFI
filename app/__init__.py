@@ -37,5 +37,14 @@ def create_app():
 
     from app.controllers.producto_controller import producto_bp
     app.register_blueprint(producto_bp)
+
+    from app.controllers.reporte_controller import reporte_bp
+    app.register_blueprint(reporte_bp)
+
+    from flask import redirect, url_for
+
+    @app.route('/')
+    def index():
+        return redirect(url_for('auth.login'))
     
     return app
