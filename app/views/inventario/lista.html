@@ -1,14 +1,18 @@
 {% extends 'base.html' %}
+{% from 'paginacion.html' import paginar %}
 {% block title %}Inventario · El Cafetero de Nufi{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h3 class="fw-bold"><i class="bi bi-box-seam"></i> Inventario</h3>
-    {% if current_user.rol in ['admin', 'operario'] %}
-    <a href="{{ url_for('inventario.nuevo') }}" class="btn btn-success">
-        <i class="bi bi-plus-lg"></i> Nuevo Elemento
-    </a>
-    {% endif %}
+    <div class="d-flex gap-2">
+        <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#modalReporteInventario">
+            <i class="bi bi-file-earmark-pdf"></i> Generar Reporte PDF
+        </button>
+        <a href="{{ url_for('inventario.nuevo') }}" class="btn btn-success">
+            <i class="bi bi-plus-lg"></i> Nuevo Elemento
+        </a>
+    </div>
 </div>
 
 <!-- Filtro por categoría -->
@@ -20,10 +24,10 @@
         <div class="col-auto">
             <select name="categoria" class="form-select" onchange="this.form.submit()">
                 <option value="">Todas</option>
-                <option value="insumo" {{ 'selected' if categoria=='insumo' }}>Insumo</option>
-                <option value="maquinaria" {{ 'selected' if categoria=='maquinaria' }}>Maquinaria</option>
+                <option value="insumo"      {{ 'selected' if categoria=='insumo' }}>Insumo</option>
+                <option value="maquinaria"  {{ 'selected' if categoria=='maquinaria' }}>Maquinaria</option>
                 <option value="herramienta" {{ 'selected' if categoria=='herramienta' }}>Herramienta</option>
-                <option value="material" {{ 'selected' if categoria=='material' }}>Material</option>
+                <option value="material"    {{ 'selected' if categoria=='material' }}>Material</option>
             </select>
         </div>
         {% if categoria %}
@@ -36,7 +40,7 @@
     </div>
 </form>
 
-<!-- Tabla de inventario -->
+<!-- Tabla -->
 <div class="card border-0 shadow-sm">
     <div class="card-body p-0">
         <table class="table table-hover mb-0">
@@ -48,7 +52,6 @@
                     <th>Stock Actual</th>
                     <th>Stock Mínimo</th>
                     <th>Unidad</th>
-                    <th>Estado</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
@@ -64,38 +67,81 @@
                         </span>
                         {% endif %}
                     </td>
-                    <td>
-                        <span class="badge bg-secondary">{{ e.categoria }}</span>
-                    </td>
+                    <td><span class="badge bg-secondary">{{ e.categoria }}</span></td>
                     <td class="{{ 'text-danger fw-bold' if e.tiene_alerta() }}">
                         {{ e.stock_actual }} {{ e.unidad_medida }}
                     </td>
                     <td>{{ e.stock_minimo }} {{ e.unidad_medida }}</td>
                     <td>{{ e.unidad_medida }}</td>
-                    <td><span class="badge bg-success">Activo</span></td>
                     <td>
-                        {% if current_user.rol in ['admin', 'operario'] %}
                         <a href="{{ url_for('inventario.editar', id=e.id) }}" class="btn btn-sm btn-outline-primary">
                             <i class="bi bi-pencil"></i>
                         </a>
                         <form method="POST" action="{{ url_for('inventario.desactivar', id=e.id) }}" class="d-inline"
                             onsubmit="return confirm('¿Desactivar {{ e.nombre }}?')">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button class="btn btn-sm btn-outline-danger">
-                                <i class="bi bi-trash"></i>
+                                <i class="bi bi-slash-circle"></i>
                             </button>
                         </form>
-                        {% endif %}
                     </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="8" class="text-center text-muted py-4">
+                    <td colspan="7" class="text-center text-muted py-4">
                         No hay elementos en el inventario.
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+    </div>
+    <div class="card-footer bg-white border-0 py-3">
+        {{ paginar(paginacion, url_anterior, url_siguiente, 'elementos') }}
+    </div>
+</div>
+
+<!-- ── MODAL REPORTE ──────────────────────────────────────────────────────── -->
+<div class="modal fade" id="modalReporteInventario" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-file-earmark-pdf me-2"></i>Generar Reporte de Inventario
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="GET" action="{{ url_for('reportes.inventario_pdf') }}" target="_blank">
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">
+                        Por defecto genera un reporte general. Personaliza los filtros si lo necesitas.
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Categoría</label>
+                        <select name="categoria" class="form-select">
+                            <option value="">Todas las categorías</option>
+                            <option value="insumo">Insumo</option>
+                            <option value="maquinaria">Maquinaria</option>
+                            <option value="herramienta">Herramienta</option>
+                            <option value="material">Material</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Estado de stock</label>
+                        <select name="alerta" class="form-select">
+                            <option value="">Todos los elementos</option>
+                            <option value="1">Solo elementos con alerta de escasez</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-file-earmark-pdf"></i> Generar PDF
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 {% endblock %}

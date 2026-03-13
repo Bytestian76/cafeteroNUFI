@@ -15,7 +15,7 @@
         <div class="card border-0 shadow-sm">
             <div class="card-body p-4">
                 <form method="POST" id="facturaForm">
-
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <!-- Cliente -->
                     <div class="mb-4">
                         <label class="form-label fw-semibold">Cliente</label>
@@ -105,11 +105,11 @@
             </div>
             <div class="col-md-2">
                 <input type="number" name="cantidad[]" class="form-control cantidad-input"
-                       placeholder="Cantidad" step="0.01" min="0.01" required>
+                    placeholder="Cantidad" step="0.01" min="0.01" required>
             </div>
             <div class="col-md-3">
                 <input type="text" class="form-control subtotal-display bg-light"
-                       placeholder="Subtotal" readonly>
+                    placeholder="Subtotal" readonly>
             </div>
             <div class="col-md-1">
                 <button type="button" class="btn btn-outline-danger btn-eliminar">

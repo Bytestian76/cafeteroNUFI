@@ -17,20 +17,20 @@
         <div class="card border-0 shadow-sm">
             <div class="card-body p-4">
                 <form method="POST">
-
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="mb-3">
                         <label class="form-label fw-semibold">Nombre completo</label>
                         <input type="text" name="nombre" class="form-control"
-                               value="{{ usuario.nombre if usuario else '' }}" required>
+                            value="{{ usuario.nombre if usuario else '' }}" required>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label fw-semibold">Correo electrónico</label>
                         <input type="email" name="email" class="form-control"
-                               value="{{ usuario.email if usuario else '' }}" required>
+                            value="{{ usuario.email if usuario else '' }}" required>
                     </div>
 
-                    <div class="mb-3">
+                    <div class="mb-4">
                         <label class="form-label fw-semibold">
                             Contraseña
                             {% if usuario %}
@@ -38,26 +38,11 @@
                             {% endif %}
                         </label>
                         <input type="password" name="password" class="form-control"
-                               {{ 'required' if not usuario else '' }}>
+                            {{ 'required' if not usuario else '' }}>
                     </div>
 
-                    <div class="mb-4">
-                        <label class="form-label fw-semibold">Rol</label>
-                        <select name="rol" class="form-select" required>
-                            <option value="operario"
-                                {{ 'selected' if usuario and usuario.rol == 'operario' }}>
-                                Operario
-                            </option>
-                            <option value="consultor"
-                                {{ 'selected' if usuario and usuario.rol == 'consultor' }}>
-                                Consultor
-                            </option>
-                            <option value="admin"
-                                {{ 'selected' if usuario and usuario.rol == 'admin' }}>
-                                Admin
-                            </option>
-                        </select>
-                    </div>
+                    <!-- Rol fijo como admin, se envía oculto -->
+                    <input type="hidden" name="rol" value="admin">
 
                     <div class="d-grid">
                         <button type="submit" class="btn btn-success">

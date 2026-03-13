@@ -1,14 +1,18 @@
 {% extends 'base.html' %}
+{% from 'paginacion.html' import paginar %}
 {% block title %}Movimientos · El Cafetero de Nufi{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h3 class="fw-bold"><i class="bi bi-arrow-left-right"></i> Historial de Movimientos</h3>
-    {% if current_user.rol in ['admin', 'operario'] %}
-    <a href="{{ url_for('movimientos.nuevo') }}" class="btn btn-primary">
-        <i class="bi bi-plus-lg"></i> Nuevo Movimiento
-    </a>
-    {% endif %}
+    <div class="d-flex gap-2">
+        <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#modalReporteMovimientos">
+            <i class="bi bi-file-earmark-pdf"></i> Generar Reporte PDF
+        </button>
+        <a href="{{ url_for('movimientos.nuevo') }}" class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i> Nuevo Movimiento
+        </a>
+    </div>
 </div>
 
 <!-- Filtros -->
@@ -21,8 +25,7 @@
                     <select name="elemento_id" class="form-select form-select-sm">
                         <option value="">Todos</option>
                         {% for e in elementos %}
-                        <option value="{{ e.id }}"
-                            {{ 'selected' if filtros.elemento_id == e.id|string }}>
+                        <option value="{{ e.id }}" {{ 'selected' if filtros.elemento_id == e.id|string }}>
                             {{ e.nombre }}
                         </option>
                         {% endfor %}
@@ -36,20 +39,27 @@
                         <option value="salida"  {{ 'selected' if filtros.tipo == 'salida' }}>Salida</option>
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label fw-semibold">Desde</label>
                     <input type="date" name="fecha_desde" class="form-control form-control-sm"
+                           max="{{ today }}"
                            value="{{ filtros.fecha_desde }}">
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label fw-semibold">Hasta</label>
                     <input type="date" name="fecha_hasta" class="form-control form-control-sm"
+                           max="{{ today }}"
                            value="{{ filtros.fecha_hasta }}">
                 </div>
                 <div class="col-md-1">
                     <button type="submit" class="btn btn-success btn-sm w-100">
                         <i class="bi bi-search"></i>
                     </button>
+                </div>
+                <div class="col-md-2">
+                    <a href="{{ url_for('movimientos.historial') }}" class="btn btn-outline-secondary btn-sm w-100">
+                        <i class="bi bi-x"></i> Limpiar
+                    </a>
                 </div>
             </div>
         </form>
@@ -97,6 +107,63 @@
                 {% endfor %}
             </tbody>
         </table>
+    </div>
+    <div class="card-footer bg-white border-0 py-3">
+        {{ paginar(paginacion, url_anterior, url_siguiente, 'movimientos') }}
+    </div>
+</div>
+
+<!-- ── MODAL REPORTE ──────────────────────────────────────────────────────── -->
+<div class="modal fade" id="modalReporteMovimientos" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-file-earmark-pdf me-2"></i>Generar Reporte de Movimientos
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="GET" action="{{ url_for('reportes.movimientos_pdf') }}" target="_blank">
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">
+                        Por defecto genera un reporte general. Personaliza los filtros si lo necesitas.
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Elemento</label>
+                        <select name="elemento_id" class="form-select">
+                            <option value="">Todos los elementos</option>
+                            {% for e in elementos %}
+                            <option value="{{ e.id }}">{{ e.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Tipo de movimiento</label>
+                        <select name="tipo" class="form-select">
+                            <option value="">Entradas y salidas</option>
+                            <option value="entrada">Solo entradas</option>
+                            <option value="salida">Solo salidas</option>
+                        </select>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label fw-semibold">Desde</label>
+                            <input type="date" name="fecha_desde" class="form-control" max="{{ today }}">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-semibold">Hasta</label>
+                            <input type="date" name="fecha_hasta" class="form-control" max="{{ today }}">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-file-earmark-pdf"></i> Generar PDF
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 {% endblock %}

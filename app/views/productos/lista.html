@@ -4,11 +4,9 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h3 class="fw-bold"><i class="bi bi-bag"></i> Productos</h3>
-    {% if current_user.rol in ['admin', 'operario'] %}
     <a href="{{ url_for('productos.nuevo') }}" class="btn btn-success">
         <i class="bi bi-plus-lg"></i> Nuevo Producto
     </a>
-    {% endif %}
 </div>
 
 <!-- Tabla de productos -->
@@ -38,24 +36,30 @@
                     </td>
                     <td>
                         {% if p.activo %}
-                        <span class="badge bg-success">Activo</span>
+                            <span class="badge bg-success">Activo</span>
                         {% else %}
-                        <span class="badge bg-danger">Inactivo</span>
+                            <span class="badge bg-secondary">Inactivo</span>
                         {% endif %}
                     </td>
                     <td>
-                        {% if current_user.rol in ['admin', 'operario'] %}
                         <a href="{{ url_for('productos.editar', id=p.id) }}" class="btn btn-sm btn-outline-primary">
                             <i class="bi bi-pencil"></i>
                         </a>
                         {% if p.activo %}
                         <form method="POST" action="{{ url_for('productos.desactivar', id=p.id) }}" class="d-inline"
                             onsubmit="return confirm('¿Desactivar {{ p.nombre }}?')">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button class="btn btn-sm btn-outline-danger">
-                                <i class="bi bi-trash"></i>
+                                <i class="bi bi-slash-circle"></i> Desactivar
                             </button>
                         </form>
-                        {% endif %}
+                        {% else %}
+                        <form method="POST" action="{{ url_for('productos.activar', id=p.id) }}" class="d-inline"
+                            onsubmit="return confirm('¿Activar {{ p.nombre }}?')">
+                            <button class="btn btn-sm btn-outline-success">
+                                <i class="bi bi-check-circle"></i> Activar
+                            </button>
+                        </form>
                         {% endif %}
                     </td>
                 </tr>

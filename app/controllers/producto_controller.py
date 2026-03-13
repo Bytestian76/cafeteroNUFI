@@ -20,7 +20,7 @@ def listar():
 
 @producto_bp.route('/productos/nuevo', methods=['GET', 'POST'])
 @login_required
-@rol_requerido('admin', 'operario')
+@rol_requerido('admin')
 def nuevo():
     if request.method == 'POST':
         nombre          = request.form['nombre']
@@ -46,7 +46,7 @@ def nuevo():
 
 @producto_bp.route('/productos/editar/<int:id>', methods=['GET', 'POST'])
 @login_required
-@rol_requerido('admin', 'operario')
+@rol_requerido('admin')
 def editar(id):
     producto = Producto.query.get_or_404(id)
 
@@ -67,10 +67,22 @@ def editar(id):
 
 @producto_bp.route('/productos/desactivar/<int:id>', methods=['POST'])
 @login_required
-@rol_requerido('admin', 'operario')
+@rol_requerido('admin')
 def desactivar(id):
     producto = Producto.query.get_or_404(id)
     producto.activo = False
     db.session.commit()
     flash(f'Producto "{producto.nombre}" desactivado.', 'warning')
+    return redirect(url_for('productos.listar'))
+
+# ─── ACTIVAR PRODUCTO ─────────────────────────────────────────────────────────
+
+@producto_bp.route('/productos/activar/<int:id>', methods=['POST'])
+@login_required
+@rol_requerido('admin')
+def activar(id):
+    producto = Producto.query.get_or_404(id)
+    producto.activo = True
+    db.session.commit()
+    flash(f'Producto "{producto.nombre}" activado correctamente.', 'success')
     return redirect(url_for('productos.listar'))

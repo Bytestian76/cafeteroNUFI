@@ -18,12 +18,17 @@ def login():
     if request.method == 'POST':
         email    = request.form['email']
         password = request.form['password']
-        usuario  = Usuario.query.filter_by(email=email, activo=True).first()
 
-        if usuario and bcrypt.check_password_hash(usuario.password_hash, password):
+        # Buscar usuario sin filtrar por activo primero
+        usuario = Usuario.query.filter_by(email=email).first()
+
+        if usuario and not usuario.activo:
+            flash('Tu cuenta está desactivada. Contacta al administrador.', 'warning')
+        elif usuario and bcrypt.check_password_hash(usuario.password_hash, password):
             login_user(usuario)
             return redirect(url_for('auth.dashboard'))
-        flash('Credenciales incorrectas', 'danger')
+        else:
+            flash('Credenciales incorrectas.', 'danger')
 
     return render_template('auth/login.html')
 
@@ -125,4 +130,16 @@ def desactivar_usuario(id):
     usuario.activo = False
     db.session.commit()
     flash(f'Usuario {usuario.nombre} desactivado.', 'warning')
+    return redirect(url_for('auth.listar_usuarios'))
+
+# ─── ACTIVAR USUARIO ─────────────────────────────────────────────────────────
+
+@auth_bp.route('/usuarios/activar/<int:id>', methods=['POST'])
+@login_required
+@rol_requerido('admin')
+def activar_usuario(id):
+    usuario = Usuario.query.get_or_404(id)
+    usuario.activo = True
+    db.session.commit()
+    flash(f'Usuario {usuario.nombre} activado correctamente.', 'success')
     return redirect(url_for('auth.listar_usuarios'))

@@ -9,11 +9,10 @@
         </a>
         <h3 class="fw-bold mb-0"><i class="bi bi-people"></i> Clientes</h3>
     </div>
-    {% if current_user.rol in ['admin', 'operario'] %}
+    
     <a href="{{ url_for('ventas.nuevo_cliente') }}" class="btn btn-warning">
         <i class="bi bi-plus-lg"></i> Nuevo Cliente
     </a>
-    {% endif %}
 </div>
 
 <div class="card border-0 shadow-sm">
@@ -38,13 +37,12 @@
                     <td>{{ c.telefono or '—' }}</td>
                     <td>{{ c.direccion or '—' }}</td>
                     <td>
-                        {% if current_user.rol in ['admin', 'operario'] %}
+                        
                         <a href="{{ url_for('ventas.editar_cliente', id=c.id) }}"
                             class="btn btn-sm btn-outline-primary">
                             <i class="bi bi-pencil"></i>
                         </a>
-                        {% endif %}
-                    </td>
+                                        </td>
                 </tr>
                 {% else %}
                 <tr>

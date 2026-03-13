@@ -3,16 +3,7 @@ from flask import abort
 from flask_login import current_user
 
 def rol_requerido(*roles):
-    """
-    Uso:
-        @login_required
-        @rol_requerido('admin')
-        def mi_vista(): ...
-
-        @login_required
-        @rol_requerido('admin', 'operario')
-        def otra_vista(): ...
-    """
+    """Solo se usa para proteger rutas que requieren rol admin."""
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):

@@ -1,21 +1,24 @@
 {% extends 'base.html' %}
+{% from 'paginacion.html' import paginar %}
 {% block title %}Ventas · El Cafetero de Nufi{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h3 class="fw-bold"><i class="bi bi-cart3"></i> Ventas</h3>
-    <div>
-        <a href="{{ url_for('ventas.listar_clientes') }}" class="btn btn-outline-secondary me-2">
+    <div class="d-flex gap-2">
+        <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#modalReporteVentas">
+            <i class="bi bi-file-earmark-pdf"></i> Generar Reporte PDF
+        </button>
+        <a href="{{ url_for('ventas.listar_clientes') }}" class="btn btn-outline-secondary">
             <i class="bi bi-people"></i> Clientes
         </a>
-        {% if current_user.rol in ['admin', 'operario'] %}
         <a href="{{ url_for('ventas.nueva') }}" class="btn btn-warning">
             <i class="bi bi-plus-lg"></i> Nueva Factura
         </a>
-        {% endif %}
     </div>
 </div>
 
+<!-- Tabla -->
 <div class="card border-0 shadow-sm">
     <div class="card-body p-0">
         <table class="table table-hover mb-0">
@@ -52,6 +55,55 @@
                 {% endfor %}
             </tbody>
         </table>
+    </div>
+    <div class="card-footer bg-white border-0 py-3">
+        {{ paginar(paginacion, url_anterior, url_siguiente, 'ventas') }}
+    </div>
+</div>
+
+<!-- ── MODAL REPORTE ──────────────────────────────────────────────────────── -->
+<div class="modal fade" id="modalReporteVentas" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title">
+                    <i class="bi bi-file-earmark-pdf me-2"></i>Generar Reporte de Ventas
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="GET" action="{{ url_for('reportes.ventas_pdf') }}" target="_blank">
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">
+                        Por defecto genera un reporte general. Personaliza los filtros si lo necesitas.
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Cliente</label>
+                        <select name="cliente_id" class="form-select">
+                            <option value="">Todos los clientes</option>
+                            {% for c in clientes %}
+                            <option value="{{ c.id }}">{{ c.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label fw-semibold">Desde</label>
+                            <input type="date" name="fecha_desde" class="form-control" max="{{ today }}">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-semibold">Hasta</label>
+                            <input type="date" name="fecha_hasta" class="form-control" max="{{ today }}">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-file-earmark-pdf"></i> Generar PDF
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 {% endblock %}

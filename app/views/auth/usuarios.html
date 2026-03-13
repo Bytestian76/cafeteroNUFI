@@ -17,7 +17,6 @@
                     <th>#</th>
                     <th>Nombre</th>
                     <th>Correo</th>
-                    <th>Rol</th>
                     <th>Estado</th>
                     <th>Creado</th>
                     <th>Acciones</th>
@@ -30,15 +29,6 @@
                     <td>{{ u.nombre }}</td>
                     <td>{{ u.email }}</td>
                     <td>
-                        {% if u.rol == 'admin' %}
-                            <span class="badge bg-danger">admin</span>
-                        {% elif u.rol == 'operario' %}
-                            <span class="badge bg-primary">operario</span>
-                        {% else %}
-                            <span class="badge bg-secondary">consultor</span>
-                        {% endif %}
-                    </td>
-                    <td>
                         {% if u.activo %}
                             <span class="badge bg-success">Activo</span>
                         {% else %}
@@ -48,24 +38,37 @@
                     <td>{{ u.created_at.strftime('%d/%m/%Y') if u.created_at else '—' }}</td>
                     <td>
                         <a href="{{ url_for('auth.editar_usuario', id=u.id) }}"
-                           class="btn btn-sm btn-outline-primary">
-                            <i class="bi bi-pencil"></i>
+                            class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-pencil"></i> Editar
                         </a>
-                        {% if u.activo and u.id != current_user.id %}
-                        <form method="POST"
-                              action="{{ url_for('auth.desactivar_usuario', id=u.id) }}"
-                              class="d-inline"
-                              onsubmit="return confirm('¿Desactivar a {{ u.nombre }}?')">
-                            <button class="btn btn-sm btn-outline-danger">
-                                <i class="bi bi-person-x"></i>
-                            </button>
-                        </form>
+
+                        {% if u.id != current_user.id %}
+                            {% if u.activo %}
+                            <form method="POST"
+                                action="{{ url_for('auth.desactivar_usuario', id=u.id) }}"
+                                class="d-inline"
+                                onsubmit="return confirm('¿Desactivar a {{ u.nombre }}?')">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-person-x"></i> Desactivar
+                                </button>
+                            </form>
+                            {% else %}
+                            <form method="POST"
+                                  action="{{ url_for('auth.activar_usuario', id=u.id) }}"
+                                  class="d-inline"
+                                  onsubmit="return confirm('¿Activar a {{ u.nombre }}?')">
+                                <button class="btn btn-sm btn-outline-success">
+                                    <i class="bi bi-person-check"></i> Activar
+                                </button>
+                            </form>
+                            {% endif %}
                         {% endif %}
                     </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="7" class="text-center text-muted py-4">No hay usuarios registrados.</td>
+                    <td colspan="6" class="text-center text-muted py-4">No hay usuarios registrados.</td>
                 </tr>
                 {% endfor %}
             </tbody>
