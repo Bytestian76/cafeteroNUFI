@@ -18,6 +18,7 @@
             <div class="card-body p-4">
                 <form method="POST">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
                     <div class="mb-3">
                         <label class="form-label fw-semibold">Nombre</label>
                         <input type="text" name="nombre" class="form-control"
@@ -30,11 +31,22 @@
                                 placeholder="Descripción del producto (opcional)">{{ producto.descripcion if producto else '' }}</textarea>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Precio Unitario</label>
-                        <input type="number" name="precio_unitario" class="form-control"
-                            step="0.01" min="0"
-                            value="{{ producto.precio_unitario if producto else '' }}" required>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">Precio Unitario</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" name="precio_unitario" class="form-control"
+                                    step="0.01" min="0"
+                                    value="{{ producto.precio_unitario if producto else '' }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">Stock Actual</label>
+                            <input type="number" name="stock_actual" class="form-control"
+                                step="0.01" min="0"
+                                value="{{ producto.stock_actual if producto else '0' }}" required>
+                        </div>
                     </div>
 
                     <div class="mb-4">

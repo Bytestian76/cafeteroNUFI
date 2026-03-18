@@ -9,14 +9,84 @@
         <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#modalReporteVentas">
             <i class="bi bi-file-earmark-pdf"></i> Generar Reporte PDF
         </button>
-        <a href="{{ url_for('ventas.listar_clientes') }}" class="btn btn-outline-secondary">
-            <i class="bi bi-people"></i> Clientes
-        </a>
         <a href="{{ url_for('ventas.nueva') }}" class="btn btn-warning">
             <i class="bi bi-plus-lg"></i> Nueva Factura
         </a>
     </div>
 </div>
+
+<!-- Filtros -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <form method="GET">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Cliente</label>
+                    <select name="cliente_id" class="form-select form-select-sm">
+                        <option value="">Todos los clientes</option>
+                        {% for c in clientes %}
+                        <option value="{{ c.id }}" {{ 'selected' if filtros.cliente_id == c.id|string }}>
+                            {{ c.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Producto</label>
+                    <select name="producto_id" class="form-select form-select-sm">
+                        <option value="">Todos los productos</option>
+                        {% for p in productos %}
+                        <option value="{{ p.id }}" {{ 'selected' if filtros.producto_id == p.id|string }}>
+                            {{ p.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">Desde</label>
+                    <input type="date" name="fecha_desde" class="form-control form-control-sm"
+                           max="{{ today }}" value="{{ filtros.fecha_desde }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">Hasta</label>
+                    <input type="date" name="fecha_hasta" class="form-control form-control-sm"
+                           max="{{ today }}" value="{{ filtros.fecha_hasta }}">
+                </div>
+                <div class="col-md-1">
+                    <button type="submit" class="btn btn-success btn-sm w-100">
+                        <i class="bi bi-search"></i>
+                    </button>
+                </div>
+                <div class="col-md-1">
+                    <a href="{{ url_for('ventas.listar') }}" class="btn btn-outline-secondary btn-sm w-100">
+                        <i class="bi bi-x"></i>
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Resumen rápido -->
+{% if paginacion.total > 0 %}
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm text-center p-3">
+            <div class="fw-bold fs-4">{{ paginacion.total }}</div>
+            <div class="text-muted small">Total facturas</div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm text-center p-3">
+            <div class="fw-bold fs-4 text-success">${{ "%.2f"|format(total_pagina) }}</div>
+            <div class="text-muted small">Total recaudado
+                {% if filtros.cliente_id or filtros.producto_id or filtros.fecha_desde or filtros.fecha_hasta %}
+                (filtrado){% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <!-- Tabla -->
 <div class="card border-0 shadow-sm">
@@ -41,7 +111,7 @@
                     <td>
                         {% for d in v.detalles %}
                         <small class="badge bg-light text-dark border me-1">
-                            {{ d.producto.nombre }} x{{ d.cantidad }}
+                            {{ d.producto.nombre }} x{{ d.cantidad|int if d.cantidad == d.cantidad|int else d.cantidad }}
                         </small>
                         {% endfor %}
                     </td>
@@ -49,7 +119,7 @@
                 {% else %}
                 <tr>
                     <td colspan="5" class="text-center text-muted py-4">
-                        No hay ventas registradas.
+                        No hay ventas que coincidan con los filtros.
                     </td>
                 </tr>
                 {% endfor %}

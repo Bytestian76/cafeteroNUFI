@@ -15,11 +15,11 @@
     </div>
 </div>
 
-<!-- Filtro por categoría -->
+<!-- Filtros -->
 <form method="GET" class="mb-4">
     <div class="row g-2 align-items-center">
         <div class="col-auto">
-            <label class="col-form-label fw-semibold">Filtrar por categoría:</label>
+            <label class="col-form-label fw-semibold">Categoría:</label>
         </div>
         <div class="col-auto">
             <select name="categoria" class="form-select" onchange="this.form.submit()">
@@ -30,10 +30,20 @@
                 <option value="material"    {{ 'selected' if categoria=='material' }}>Material</option>
             </select>
         </div>
+        <div class="col-auto">
+            <div class="form-check form-switch ms-2">
+                <input class="form-check-input" type="checkbox" name="inactivos" value="1"
+                    id="chkInactivos" onchange="this.form.submit()"
+                    {{ 'checked' if mostrar_inactivos }}>
+                <label class="form-check-label fw-semibold" for="chkInactivos">
+                    Mostrar inactivos
+                </label>
+            </div>
+        </div>
         {% if categoria %}
         <div class="col-auto">
             <a href="{{ url_for('inventario.listar') }}" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-x"></i> Limpiar filtro
+                <i class="bi bi-x"></i> Limpiar
             </a>
         </div>
         {% endif %}
@@ -52,43 +62,65 @@
                     <th>Stock Actual</th>
                     <th>Stock Mínimo</th>
                     <th>Unidad</th>
+                    <th>Estado</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
                 {% for e in elementos %}
-                <tr>
+                <tr class="{{ 'table-secondary text-muted' if not e.activo }}">
                     <td>{{ e.id }}</td>
                     <td>
                         {{ e.nombre }}
-                        {% if e.tiene_alerta() %}
+                        {% if e.activo and e.tiene_alerta() %}
                         <span class="badge bg-danger ms-1">
                             <i class="bi bi-exclamation-triangle"></i> Escasez
                         </span>
                         {% endif %}
                     </td>
                     <td><span class="badge bg-secondary">{{ e.categoria }}</span></td>
-                    <td class="{{ 'text-danger fw-bold' if e.tiene_alerta() }}">
+                    <td class="{{ 'text-danger fw-bold' if e.activo and e.tiene_alerta() }}">
                         {{ e.stock_actual }} {{ e.unidad_medida }}
                     </td>
                     <td>{{ e.stock_minimo }} {{ e.unidad_medida }}</td>
                     <td>{{ e.unidad_medida }}</td>
                     <td>
-                        <a href="{{ url_for('inventario.editar', id=e.id) }}" class="btn btn-sm btn-outline-primary">
+                        {% if e.activo %}
+                            <span class="badge bg-success">Activo</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Inactivo</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{{ url_for('inventario.editar', id=e.id) }}"
+                           class="btn btn-sm btn-outline-primary" title="Editar">
                             <i class="bi bi-pencil"></i>
                         </a>
-                        <form method="POST" action="{{ url_for('inventario.desactivar', id=e.id) }}" class="d-inline"
-                            onsubmit="return confirm('¿Desactivar {{ e.nombre }}?')">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button class="btn btn-sm btn-outline-danger">
-                                <i class="bi bi-slash-circle"></i>
-                            </button>
-                        </form>
+
+                        {% if e.activo %}
+                        <button type="button" class="btn btn-sm btn-outline-warning"
+                            data-id="{{ e.id }}" data-nombre="{{ e.nombre }}" data-accion="desactivar"
+                            onclick="confirmarEstado(this)" title="Desactivar">
+                            <i class="bi bi-slash-circle"></i>
+                        </button>
+                        {% else %}
+                        <button type="button" class="btn btn-sm btn-outline-success"
+                            data-id="{{ e.id }}" data-nombre="{{ e.nombre }}" data-accion="activar"
+                            onclick="confirmarEstado(this)" title="Activar">
+                            <i class="bi bi-check-circle"></i>
+                        </button>
+                        {% endif %}
+
+                        <button type="button" class="btn btn-sm btn-outline-danger"
+                            data-id="{{ e.id }}" data-nombre="{{ e.nombre }}"
+                            onclick="confirmarEliminar(this)" title="Eliminar permanentemente">
+                            <i class="bi bi-trash"></i>
+                        </button>
                     </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="7" class="text-center text-muted py-4">
+                    <td colspan="8" class="text-center text-muted py-4">
                         No hay elementos en el inventario.
                     </td>
                 </tr>
@@ -98,6 +130,53 @@
     </div>
     <div class="card-footer bg-white border-0 py-3">
         {{ paginar(paginacion, url_anterior, url_siguiente, 'elementos') }}
+    </div>
+</div>
+
+<!-- ── MODAL ACTIVAR / DESACTIVAR ────────────────────────────────────────── -->
+<div class="modal fade" id="modalEstado" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header text-white" id="modalEstadoHeader">
+                <h6 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Confirmar acción</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center py-3">
+                <p class="mb-1" id="modalEstadoTexto"></p>
+                <p class="fw-bold mb-0" id="modalEstadoNombre"></p>
+            </div>
+            <div class="modal-footer justify-content-center border-0 pt-0">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                <form id="formEstado" method="POST" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-sm" id="btnEstado">Confirmar</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── MODAL ELIMINAR ────────────────────────────────────────────────────── -->
+<div class="modal fade" id="modalEliminar" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-danger text-white">
+                <h6 class="modal-title"><i class="bi bi-trash me-2"></i>Eliminar permanentemente</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center py-3">
+                <p class="mb-1">¿Eliminar definitivamente el elemento</p>
+                <p class="fw-bold mb-2" id="modalEliminarNombre"></p>
+                <small class="text-danger">Esta acción no se puede deshacer.</small>
+            </div>
+            <div class="modal-footer justify-content-center border-0 pt-0">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                <form id="formEliminar" method="POST" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-danger btn-sm">Sí, eliminar</button>
+                </form>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -144,4 +223,31 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function confirmarEstado(btn) {
+    const id     = btn.dataset.id;
+    const nombre = btn.dataset.nombre;
+    const accion = btn.dataset.accion;
+    const esDesactivar = accion === 'desactivar';
+    document.getElementById('modalEstadoHeader').className =
+        'modal-header text-white ' + (esDesactivar ? 'bg-warning' : 'bg-success');
+    document.getElementById('modalEstadoTexto').textContent =
+        '¿' + (esDesactivar ? 'Desactivar' : 'Activar') + ' el elemento';
+    document.getElementById('modalEstadoNombre').textContent = nombre + '?';
+    document.getElementById('formEstado').action = '/inventario/' + accion + '/' + id;
+    const btnC = document.getElementById('btnEstado');
+    btnC.className = 'btn btn-sm ' + (esDesactivar ? 'btn-warning' : 'btn-success');
+    btnC.textContent = esDesactivar ? 'Sí, desactivar' : 'Sí, activar';
+    new bootstrap.Modal(document.getElementById('modalEstado')).show();
+}
+
+function confirmarEliminar(btn) {
+    document.getElementById('modalEliminarNombre').textContent = btn.dataset.nombre + '?';
+    document.getElementById('formEliminar').action = '/inventario/eliminar/' + btn.dataset.id;
+    new bootstrap.Modal(document.getElementById('modalEliminar')).show();
+}
+</script>
 {% endblock %}

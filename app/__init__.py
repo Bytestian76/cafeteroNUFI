@@ -9,13 +9,12 @@ db = SQLAlchemy()
 login_manager = LoginManager()
 migrate = Migrate()
 bcrypt = Bcrypt()
-csrf = CSRFProtect() 
+csrf = CSRFProtect()
 
 def create_app():
     app = Flask(__name__, template_folder='views')
     app.config.from_object('config.Config')
 
-    # Inicializar extensiones
     db.init_app(app)
     login_manager.init_app(app)
     migrate.init_app(app, db)
@@ -24,8 +23,8 @@ def create_app():
 
     login_manager.login_view = 'auth.login'
     login_manager.login_message = 'Debes iniciar sesión para acceder.'
+    login_manager.login_message_category = 'warning'
 
-    # Registrar blueprints (controladores)
     from app.controllers.auth_controller import auth_bp
     app.register_blueprint(auth_bp)
 
@@ -34,7 +33,7 @@ def create_app():
 
     from app.controllers.movimiento_controller import movimiento_bp
     app.register_blueprint(movimiento_bp)
-    
+
     from app.controllers.venta_controller import venta_bp
     app.register_blueprint(venta_bp)
 
@@ -44,16 +43,17 @@ def create_app():
     from app.controllers.reporte_controller import reporte_bp
     app.register_blueprint(reporte_bp)
 
+    # ── Fecha de hoy disponible en todos los templates ──────────────────────
+    from datetime import date
+
+    @app.context_processor
+    def inyectar_globals():
+        return {'today': date.today().isoformat()}
+    
     from flask import redirect, url_for
 
     @app.route('/')
     def index():
         return redirect(url_for('auth.login'))
-    
-    from datetime import date
-
-    @app.context_processor
-    def inyectar_fecha_hoy():
-        return {'today': date.today().isoformat()}
 
     return app

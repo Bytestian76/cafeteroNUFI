@@ -24,7 +24,7 @@
             </thead>
             <tbody>
                 {% for u in usuarios %}
-                <tr class="{% if not u.activo %}table-secondary text-muted{% endif %}">
+                <tr class="{{ 'table-secondary text-muted' if not u.activo }}">
                     <td>{{ u.id }}</td>
                     <td>{{ u.nombre }}</td>
                     <td>{{ u.email }}</td>
@@ -44,24 +44,21 @@
 
                         {% if u.id != current_user.id %}
                             {% if u.activo %}
-                            <form method="POST"
-                                action="{{ url_for('auth.desactivar_usuario', id=u.id) }}"
-                                class="d-inline"
-                                onsubmit="return confirm('¿Desactivar a {{ u.nombre }}?')">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button class="btn btn-sm btn-outline-danger">
-                                    <i class="bi bi-person-x"></i> Desactivar
-                                </button>
-                            </form>
+                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                data-id="{{ u.id }}"
+                                data-nombre="{{ u.nombre }}"
+                                data-accion="desactivar"
+                                onclick="confirmarUsuario(this)">
+                                <i class="bi bi-person-x"></i> Desactivar
+                            </button>
                             {% else %}
-                            <form method="POST"
-                                  action="{{ url_for('auth.activar_usuario', id=u.id) }}"
-                                  class="d-inline"
-                                  onsubmit="return confirm('¿Activar a {{ u.nombre }}?')">
-                                <button class="btn btn-sm btn-outline-success">
-                                    <i class="bi bi-person-check"></i> Activar
-                                </button>
-                            </form>
+                            <button type="button" class="btn btn-sm btn-outline-success"
+                                data-id="{{ u.id }}"
+                                data-nombre="{{ u.nombre }}"
+                                data-accion="activar"
+                                onclick="confirmarUsuario(this)">
+                                <i class="bi bi-person-check"></i> Activar
+                            </button>
                             {% endif %}
                         {% endif %}
                     </td>
@@ -75,4 +72,53 @@
         </table>
     </div>
 </div>
+
+<!-- ── MODAL CONFIRMACIÓN USUARIO ────────────────────────────────────────── -->
+<div class="modal fade" id="modalConfirmarUsuario" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header text-white" id="modalHeaderUsuario">
+                <h6 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Confirmar acción</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center py-3">
+                <p class="mb-1" id="modalTextoUsuario"></p>
+                <p class="fw-bold mb-0" id="nombreUsuario"></p>
+            </div>
+            <div class="modal-footer justify-content-center border-0 pt-0">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">
+                    Cancelar
+                </button>
+                <form id="formAccionUsuario" method="POST" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-sm" id="btnConfirmarUsuario">
+                        Confirmar
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function confirmarUsuario(btn) {
+    const id     = btn.dataset.id;
+    const nombre = btn.dataset.nombre;
+    const accion = btn.dataset.accion;
+    const esDesactivar = accion === 'desactivar';
+    document.getElementById('modalHeaderUsuario').className =
+        'modal-header text-white ' + (esDesactivar ? 'bg-danger' : 'bg-success');
+    document.getElementById('modalTextoUsuario').textContent =
+        '¿' + (esDesactivar ? 'Desactivar' : 'Activar') + ' al usuario';
+    document.getElementById('nombreUsuario').textContent = nombre + '?';
+    document.getElementById('formAccionUsuario').action =
+        '/usuarios/' + accion + '/' + id;
+    const btn2 = document.getElementById('btnConfirmarUsuario');
+    btn2.className = 'btn btn-sm ' + (esDesactivar ? 'btn-danger' : 'btn-success');
+    btn2.textContent = esDesactivar ? 'Sí, desactivar' : 'Sí, activar';
+    new bootstrap.Modal(document.getElementById('modalConfirmarUsuario')).show();
+}
+</script>
 {% endblock %}

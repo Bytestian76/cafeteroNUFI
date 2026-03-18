@@ -18,6 +18,7 @@
             <div class="card-body p-4">
                 <form method="POST">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
                     <div class="mb-3">
                         <label class="form-label fw-semibold">Nombre</label>
                         <input type="text" name="nombre" class="form-control"
@@ -28,41 +29,68 @@
                         <label class="form-label fw-semibold">Categoría</label>
                         <select name="categoria" class="form-select" required>
                             <option value="">Seleccionar...</option>
-                            <option value="insumo" {{ 'selected' if elemento and elemento.categoria=='insumo' }}>
-                                Insumo
-                            </option>
-                            <option value="maquinaria" {{ 'selected' if elemento and elemento.categoria=='maquinaria'
-                                }}>
-                                Maquinaria
-                            </option>
-                            <option value="herramienta" {{ 'selected' if elemento and elemento.categoria=='herramienta'
-                                }}>
-                                Herramienta
-                            </option>
-                            <option value="material" {{ 'selected' if elemento and elemento.categoria=='material' }}>
-                                Material
-                            </option>
+                            <option value="insumo"      {{ 'selected' if elemento and elemento.categoria=='insumo' }}>Insumo</option>
+                            <option value="maquinaria"  {{ 'selected' if elemento and elemento.categoria=='maquinaria' }}>Maquinaria</option>
+                            <option value="herramienta" {{ 'selected' if elemento and elemento.categoria=='herramienta' }}>Herramienta</option>
+                            <option value="material"    {{ 'selected' if elemento and elemento.categoria=='material' }}>Material</option>
                         </select>
                     </div>
 
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label fw-semibold">Stock Actual</label>
-                            <input type="number" name="stock_actual" class="form-control" step="0.01" min="0"
+                            <input type="number" name="stock_actual" class="form-control"
+                                step="0.01" min="0"
                                 value="{{ elemento.stock_actual if elemento else '0' }}" required>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label fw-semibold">Stock Mínimo</label>
-                            <input type="number" name="stock_minimo" class="form-control" step="0.01" min="0"
+                            <input type="number" name="stock_minimo" class="form-control"
+                                step="0.01" min="0"
                                 value="{{ elemento.stock_minimo if elemento else '0' }}" required>
                         </div>
                     </div>
 
                     <div class="mb-4">
                         <label class="form-label fw-semibold">Unidad de Medida</label>
-                        <input type="text" name="unidad_medida" class="form-control"
-                            placeholder="kg, litros, unidades, etc."
-                            value="{{ elemento.unidad_medida if elemento else '' }}" required>
+                        <select name="unidad_medida" class="form-select" id="selectUnidad" required>
+                            <option value="">Seleccionar...</option>
+                            <!-- Masa / Peso -->
+                            <optgroup label="Masa / Peso">
+                                <option value="kg"  {{ 'selected' if elemento and elemento.unidad_medida=='kg' }}>Kilogramo (kg)</option>
+                                <option value="g"   {{ 'selected' if elemento and elemento.unidad_medida=='g' }}>Gramo (g)</option>
+                                <option value="lb"  {{ 'selected' if elemento and elemento.unidad_medida=='lb' }}>Libra (lb)</option>
+                                <option value="t"   {{ 'selected' if elemento and elemento.unidad_medida=='t' }}>Tonelada (t)</option>
+                                <option value="arroba" {{ 'selected' if elemento and elemento.unidad_medida=='arroba' }}>Arroba</option>
+                            </optgroup>
+                            <!-- Volumen -->
+                            <optgroup label="Volumen">
+                                <option value="L"   {{ 'selected' if elemento and elemento.unidad_medida=='L' }}>Litro (L)</option>
+                                <option value="mL"  {{ 'selected' if elemento and elemento.unidad_medida=='mL' }}>Mililitro (mL)</option>
+                                <option value="gal" {{ 'selected' if elemento and elemento.unidad_medida=='gal' }}>Galón (gal)</option>
+                            </optgroup>
+                            <!-- Cantidad -->
+                            <optgroup label="Cantidad">
+                                <option value="unidad"  {{ 'selected' if elemento and elemento.unidad_medida=='unidad' }}>Unidad</option>
+                                <option value="bulto"   {{ 'selected' if elemento and elemento.unidad_medida=='bulto' }}>Bulto</option>
+                                <option value="saco"    {{ 'selected' if elemento and elemento.unidad_medida=='saco' }}>Saco</option>
+                                <option value="caja"    {{ 'selected' if elemento and elemento.unidad_medida=='caja' }}>Caja</option>
+                                <option value="paquete" {{ 'selected' if elemento and elemento.unidad_medida=='paquete' }}>Paquete</option>
+                                <option value="rollo"   {{ 'selected' if elemento and elemento.unidad_medida=='rollo' }}>Rollo</option>
+                            </optgroup>
+                            <!-- Longitud / Área -->
+                            <optgroup label="Longitud / Área">
+                                <option value="m"   {{ 'selected' if elemento and elemento.unidad_medida=='m' }}>Metro (m)</option>
+                                <option value="m2"  {{ 'selected' if elemento and elemento.unidad_medida=='m2' }}>Metro cuadrado (m²)</option>
+                                <option value="ha"  {{ 'selected' if elemento and elemento.unidad_medida=='ha' }}>Hectárea (ha)</option>
+                            </optgroup>
+                            <option value="otro" {{ 'selected' if elemento and elemento.unidad_medida not in ['kg','g','lb','t','arroba','L','mL','gal','unidad','bulto','saco','caja','paquete','rollo','m','m2','ha'] }}>Otro...</option>
+                        </select>
+
+                        <!-- Campo libre si elige "Otro" -->
+                        <input type="text" id="unidadPersonalizada" name="unidad_personalizada"
+                            class="form-control mt-2 d-none"
+                            placeholder="Escribe la unidad personalizada...">
                     </div>
 
                     <div class="d-grid">
@@ -78,4 +106,21 @@
 
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Mostrar campo personalizado si elige "Otro"
+document.getElementById('selectUnidad').addEventListener('change', function() {
+    const campo = document.getElementById('unidadPersonalizada');
+    if (this.value === 'otro') {
+        campo.classList.remove('d-none');
+        campo.required = true;
+    } else {
+        campo.classList.add('d-none');
+        campo.required = false;
+        campo.value = '';
+    }
+});
+</script>
 {% endblock %}

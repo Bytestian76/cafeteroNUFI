@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% from 'paginacion.html' import paginar %}
 {% block title %}Productos · El Cafetero de Nufi{% endblock %}
 
 {% block content %}
@@ -9,7 +10,41 @@
     </a>
 </div>
 
-<!-- Tabla de productos -->
+<!-- Filtros -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <form method="GET">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Buscar por nombre</label>
+                    <input type="text" name="nombre" class="form-control form-control-sm"
+                           placeholder="Escribe el nombre del producto..."
+                           value="{{ filtros.nombre }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Estado</label>
+                    <select name="estado" class="form-select form-select-sm">
+                        <option value="">Todos</option>
+                        <option value="activo"   {{ 'selected' if filtros.estado == 'activo' }}>Solo activos</option>
+                        <option value="inactivo" {{ 'selected' if filtros.estado == 'inactivo' }}>Solo inactivos</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-success btn-sm w-100">
+                        <i class="bi bi-search"></i> Filtrar
+                    </button>
+                </div>
+                <div class="col-md-1">
+                    <a href="{{ url_for('productos.listar') }}" class="btn btn-outline-secondary btn-sm w-100">
+                        <i class="bi bi-x"></i>
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Tabla -->
 <div class="card border-0 shadow-sm">
     <div class="card-body p-0">
         <table class="table table-hover mb-0">
@@ -20,19 +55,31 @@
                     <th>Descripción</th>
                     <th>Precio Unitario</th>
                     <th>Unidad</th>
+                    <th>Stock Actual</th>
                     <th>Estado</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
                 {% for p in productos %}
-                <tr>
+                <tr class="{{ 'table-secondary' if not p.activo }}">
                     <td>{{ p.id }}</td>
                     <td>{{ p.nombre }}</td>
-                    <td class="text-muted small">{{ p.descripcion if p.descripcion else '—' }}</td>
+                    <td class="text-muted small">{{ p.descripcion or '—' }}</td>
                     <td>${{ "%.2f"|format(p.precio_unitario) }}</td>
+                    <td><span class="badge bg-secondary">{{ p.unidad_medida }}</span></td>
                     <td>
-                        <span class="badge bg-secondary">{{ p.unidad_medida }}</span>
+                        {% if p.stock_actual is not none %}
+                            <span class="{{ 'text-danger fw-bold' if p.stock_actual == 0 }}">
+                                {{ "%.0f"|format(p.stock_actual) if p.stock_actual == p.stock_actual|int else "%.2f"|format(p.stock_actual) }}
+                                {{ p.unidad_medida }}
+                            </span>
+                            {% if p.stock_actual == 0 %}
+                                <span class="badge bg-danger ms-1">Sin stock</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
                     </td>
                     <td>
                         {% if p.activo %}
@@ -46,32 +93,77 @@
                             <i class="bi bi-pencil"></i>
                         </a>
                         {% if p.activo %}
-                        <form method="POST" action="{{ url_for('productos.desactivar', id=p.id) }}" class="d-inline"
-                            onsubmit="return confirm('¿Desactivar {{ p.nombre }}?')">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button class="btn btn-sm btn-outline-danger">
-                                <i class="bi bi-slash-circle"></i> Desactivar
-                            </button>
-                        </form>
+                        <button type="button" class="btn btn-sm btn-outline-danger"
+                            data-id="{{ p.id }}" data-nombre="{{ p.nombre }}" data-accion="desactivar"
+                            onclick="confirmarAccion(this)">
+                            <i class="bi bi-slash-circle"></i> Desactivar
+                        </button>
                         {% else %}
-                        <form method="POST" action="{{ url_for('productos.activar', id=p.id) }}" class="d-inline"
-                            onsubmit="return confirm('¿Activar {{ p.nombre }}?')">
-                            <button class="btn btn-sm btn-outline-success">
-                                <i class="bi bi-check-circle"></i> Activar
-                            </button>
-                        </form>
+                        <button type="button" class="btn btn-sm btn-outline-success"
+                            data-id="{{ p.id }}" data-nombre="{{ p.nombre }}" data-accion="activar"
+                            onclick="confirmarAccion(this)">
+                            <i class="bi bi-check-circle"></i> Activar
+                        </button>
                         {% endif %}
                     </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="7" class="text-center text-muted py-4">
-                        No hay productos registrados.
+                    <td colspan="8" class="text-center text-muted py-4">
+                        No hay productos que coincidan con los filtros.
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+    <div class="card-footer bg-white border-0 py-3">
+        {{ paginar(paginacion, url_anterior, url_siguiente, 'productos') }}
+    </div>
+</div>
+
+<!-- ── MODAL CONFIRMACIÓN ─────────────────────────────────────────────────── -->
+<div class="modal fade" id="modalConfirmarProducto" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header text-white" id="modalHeaderProducto">
+                <h6 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Confirmar acción</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center py-3">
+                <p class="mb-1" id="modalTextoProducto"></p>
+                <p class="fw-bold mb-0" id="nombreProducto"></p>
+            </div>
+            <div class="modal-footer justify-content-center border-0 pt-0">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                <form id="formAccionProducto" method="POST" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-sm" id="btnConfirmarProducto">Confirmar</button>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
+
+{% block scripts %}
+<script>
+function confirmarAccion(btn) {
+    const id     = btn.dataset.id;
+    const nombre = btn.dataset.nombre;
+    const accion = btn.dataset.accion;
+    const esDesactivar = accion === 'desactivar';
+    document.getElementById('modalHeaderProducto').className =
+        'modal-header text-white ' + (esDesactivar ? 'bg-danger' : 'bg-success');
+    document.getElementById('modalTextoProducto').textContent =
+        '¿' + (esDesactivar ? 'Desactivar' : 'Activar') + ' el producto';
+    document.getElementById('nombreProducto').textContent = nombre + '?';
+    document.getElementById('formAccionProducto').action = '/productos/' + accion + '/' + id;
+    const btnC = document.getElementById('btnConfirmarProducto');
+    btnC.className = 'btn btn-sm ' + (esDesactivar ? 'btn-danger' : 'btn-success');
+    btnC.textContent = esDesactivar ? 'Sí, desactivar' : 'Sí, activar';
+    new bootstrap.Modal(document.getElementById('modalConfirmarProducto')).show();
+}
+</script>
+{% endblock %}
+a

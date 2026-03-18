@@ -9,11 +9,12 @@ inventario_bp = Blueprint('inventario', __name__)
 POR_PAGINA = 10
 
 
-def _url_pagina(pagina, categoria=''):
-    """Construye la URL de paginación conservando los filtros activos."""
+def _url_pagina(pagina, categoria='', mostrar_inactivos=''):
     params = f'pagina={pagina}'
     if categoria:
         params += f'&categoria={categoria}'
+    if mostrar_inactivos:
+        params += f'&inactivos={mostrar_inactivos}'
     return f'/inventario?{params}'
 
 
@@ -22,10 +23,13 @@ def _url_pagina(pagina, categoria=''):
 @inventario_bp.route('/inventario')
 @login_required
 def listar():
-    categoria = request.args.get('categoria', '')
-    pagina    = request.args.get('pagina', 1, type=int)
+    categoria         = request.args.get('categoria', '')
+    mostrar_inactivos = request.args.get('inactivos', '')
+    pagina            = request.args.get('pagina', 1, type=int)
 
-    query = ElementoInventario.query.filter_by(activo=True)
+    query = ElementoInventario.query
+    if not mostrar_inactivos:
+        query = query.filter_by(activo=True)
     if categoria:
         query = query.filter_by(categoria=categoria)
 
@@ -33,13 +37,14 @@ def listar():
         page=pagina, per_page=POR_PAGINA, error_out=False
     )
 
-    url_anterior = _url_pagina(paginacion.prev_num, categoria) if paginacion.has_prev else '#'
-    url_siguiente = _url_pagina(paginacion.next_num, categoria) if paginacion.has_next else '#'
+    url_anterior  = _url_pagina(paginacion.prev_num, categoria, mostrar_inactivos) if paginacion.has_prev else '#'
+    url_siguiente = _url_pagina(paginacion.next_num, categoria, mostrar_inactivos) if paginacion.has_next else '#'
 
     return render_template('inventario/lista.html',
                            elementos=paginacion.items,
                            paginacion=paginacion,
                            categoria=categoria,
+                           mostrar_inactivos=mostrar_inactivos,
                            url_anterior=url_anterior,
                            url_siguiente=url_siguiente)
 
@@ -51,11 +56,15 @@ def listar():
 @rol_requerido('admin')
 def nuevo():
     if request.method == 'POST':
-        nombre        = request.form['nombre']
+        nombre        = request.form['nombre'].strip()
         categoria     = request.form['categoria']
         stock_actual  = request.form['stock_actual']
         stock_minimo  = request.form['stock_minimo']
         unidad_medida = request.form['unidad_medida']
+
+        if not nombre or not categoria or not unidad_medida:
+            flash('Nombre, categoría y unidad de medida son obligatorios.', 'danger')
+            return render_template('inventario/form.html', elemento=None)
 
         elemento = ElementoInventario(
             nombre=nombre, categoria=categoria,
@@ -79,7 +88,7 @@ def editar(id):
     elemento = ElementoInventario.query.get_or_404(id)
 
     if request.method == 'POST':
-        elemento.nombre        = request.form['nombre']
+        elemento.nombre        = request.form['nombre'].strip()
         elemento.categoria     = request.form['categoria']
         elemento.stock_actual  = request.form['stock_actual']
         elemento.stock_minimo  = request.form['stock_minimo']
@@ -101,5 +110,38 @@ def desactivar(id):
     elemento = ElementoInventario.query.get_or_404(id)
     elemento.activo = False
     db.session.commit()
-    flash(f'Elemento "{elemento.nombre}" desactivado.', 'warning')
+    flash(f'Elemento "{elemento.nombre}" desactivado. Ya no emitirá alertas.', 'warning')
+    return redirect(url_for('inventario.listar'))
+
+
+# ─── ACTIVAR ELEMENTO ────────────────────────────────────────────────────────
+
+@inventario_bp.route('/inventario/activar/<int:id>', methods=['POST'])
+@login_required
+@rol_requerido('admin')
+def activar(id):
+    elemento = ElementoInventario.query.get_or_404(id)
+    elemento.activo = True
+    db.session.commit()
+    flash(f'Elemento "{elemento.nombre}" activado correctamente.', 'success')
+    return redirect(url_for('inventario.listar'))
+
+
+# ─── ELIMINAR ELEMENTO ───────────────────────────────────────────────────────
+
+@inventario_bp.route('/inventario/eliminar/<int:id>', methods=['POST'])
+@login_required
+@rol_requerido('admin')
+def eliminar(id):
+    elemento = ElementoInventario.query.get_or_404(id)
+
+    # Verificar si tiene movimientos asociados
+    if elemento.movimientos:
+        flash(f'No se puede eliminar "{elemento.nombre}" porque tiene {len(elemento.movimientos)} movimiento(s) registrado(s). Desactívalo en su lugar.', 'danger')
+        return redirect(url_for('inventario.listar'))
+
+    nombre = elemento.nombre
+    db.session.delete(elemento)
+    db.session.commit()
+    flash(f'Elemento "{nombre}" eliminado permanentemente.', 'danger')
     return redirect(url_for('inventario.listar'))

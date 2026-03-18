@@ -66,12 +66,12 @@ def historial():
     url_siguiente = _url_pagina(paginacion.next_num, elemento_id, tipo, fecha_desde, fecha_hasta) if paginacion.has_next else '#'
 
     return render_template('movimientos/historial.html',
-                           movimientos=paginacion.items,
-                           paginacion=paginacion,
-                           elementos=elementos,
-                           url_anterior=url_anterior,
-                           url_siguiente=url_siguiente,
-                           filtros={'elemento_id': elemento_id, 'tipo': tipo,
+                        movimientos=paginacion.items,
+                        paginacion=paginacion,
+                        elementos=elementos,
+                        url_anterior=url_anterior,
+                        url_siguiente=url_siguiente,
+                        filtros={'elemento_id': elemento_id, 'tipo': tipo,
                                     'fecha_desde': fecha_desde, 'fecha_hasta': fecha_hasta})
 
 

@@ -6,20 +6,19 @@ from app.models.inventario import ElementoInventario
 from app.utils.decorators import rol_requerido
 
 auth_bp = Blueprint('auth', __name__)
-@auth_bp.route('/')
-def index():
-    return redirect(url_for('auth.login'))
 
 
 # ─── LOGIN ───────────────────────────────────────────────────────────────────
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('auth.dashboard'))
+
     if request.method == 'POST':
         email    = request.form['email']
         password = request.form['password']
 
-        # Buscar usuario sin filtrar por activo primero
         usuario = Usuario.query.filter_by(email=email).first()
 
         if usuario and not usuario.activo:
@@ -47,15 +46,16 @@ def logout():
 @auth_bp.route('/dashboard')
 @login_required
 def dashboard():
-    # Consultar elementos con alerta de escasez para mostrar en el dashboard
-    elementos_alerta = [
-        e for e in ElementoInventario.query.filter_by(activo=True).all()
-        if e.tiene_alerta()
-    ]
+    # Filtra directamente en SQL — más eficiente que cargar todo en Python
+    elementos_alerta = ElementoInventario.query.filter(
+        ElementoInventario.activo == True,
+        ElementoInventario.stock_actual < ElementoInventario.stock_minimo
+    ).order_by(ElementoInventario.nombre).all()
+
     return render_template('auth/dashboard.html', elementos_alerta=elementos_alerta)
 
 
-# ─── LISTAR USUARIOS (solo admin) ────────────────────────────────────────────
+# ─── LISTAR USUARIOS ─────────────────────────────────────────────────────────
 
 @auth_bp.route('/usuarios')
 @login_required
@@ -72,14 +72,18 @@ def listar_usuarios():
 @rol_requerido('admin')
 def nuevo_usuario():
     if request.method == 'POST':
-        nombre   = request.form['nombre']
-        email    = request.form['email']
+        nombre   = request.form['nombre'].strip()
+        email    = request.form['email'].strip()
         password = request.form['password']
-        rol      = request.form['rol']
+        rol      = request.form.get('rol', 'admin')
+
+        if not nombre or not email or not password:
+            flash('Todos los campos son obligatorios.', 'danger')
+            return render_template('auth/form_usuario.html', usuario=None)
 
         if Usuario.query.filter_by(email=email).first():
             flash('Ya existe un usuario con ese correo.', 'danger')
-            return redirect(url_for('auth.nuevo_usuario'))
+            return render_template('auth/form_usuario.html', usuario=None)
 
         hash_pw = bcrypt.generate_password_hash(password).decode('utf-8')
         usuario = Usuario(nombre=nombre, email=email, password_hash=hash_pw, rol=rol)
@@ -100,11 +104,24 @@ def editar_usuario(id):
     usuario = Usuario.query.get_or_404(id)
 
     if request.method == 'POST':
-        usuario.nombre = request.form['nombre']
-        usuario.email  = request.form['email']
-        usuario.rol    = request.form['rol']
+        nombre = request.form['nombre'].strip()
+        email  = request.form['email'].strip()
 
-        nueva_pw = request.form['password']
+        if not nombre or not email:
+            flash('Nombre y correo son obligatorios.', 'danger')
+            return render_template('auth/form_usuario.html', usuario=usuario)
+
+        # Verificar que el email no lo use otro usuario
+        existente = Usuario.query.filter_by(email=email).first()
+        if existente and existente.id != usuario.id:
+            flash('Ese correo ya está en uso por otro usuario.', 'danger')
+            return render_template('auth/form_usuario.html', usuario=usuario)
+
+        usuario.nombre = nombre
+        usuario.email  = email
+        usuario.rol    = request.form.get('rol', 'admin')
+
+        nueva_pw = request.form.get('password', '')
         if nueva_pw:
             usuario.password_hash = bcrypt.generate_password_hash(nueva_pw).decode('utf-8')
 
@@ -131,6 +148,7 @@ def desactivar_usuario(id):
     db.session.commit()
     flash(f'Usuario {usuario.nombre} desactivado.', 'warning')
     return redirect(url_for('auth.listar_usuarios'))
+
 
 # ─── ACTIVAR USUARIO ─────────────────────────────────────────────────────────
 

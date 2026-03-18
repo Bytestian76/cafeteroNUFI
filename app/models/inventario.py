@@ -14,8 +14,8 @@ class ElementoInventario(db.Model):
     movimientos = db.relationship('Movimiento', backref='elemento', lazy=True)
 
     def tiene_alerta(self):
-        """Retorna True si el stock actual está en nivel de escasez."""
-        return self.stock_actual <= self.stock_minimo
+        """Retorna True si el stock actual está POR DEBAJO del mínimo (no igual)."""
+        return self.stock_actual < self.stock_minimo
 
     def __repr__(self):
         return f'<Elemento {self.nombre}>'
