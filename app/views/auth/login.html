@@ -2,38 +2,317 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Login · El Cafetero de Nufi</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ingresar · El Cafetero de Nufi</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="bg-success d-flex align-items-center justify-content-center" style="min-height:100vh">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
 
-<div class="card shadow" style="width: 400px">
-    <div class="card-body p-4">
-        <h4 class="text-center mb-1 fw-bold text-success">
-            🌿 El Cafetero de Nufi
-        </h4>
-        <p class="text-center text-muted mb-4">Sistema de Gestión Agrícola</p>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #1a2e1a;
+        }
+
+        /* ── Panel izquierdo: branding ── */
+        .panel-branding {
+            width: 55%;
+            background:
+                linear-gradient(160deg, rgba(10,30,10,0.72) 0%, rgba(45,90,25,0.60) 100%),
+                url('https://images.unsplash.com/photo-1447933601403-0c6688de566e?w=1200&q=80') center/cover no-repeat;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 60px 56px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .brand-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255,255,255,0.12);
+            border: 1px solid rgba(255,255,255,0.20);
+            color: #c8e6c9;
+            font-size: 0.92rem;
+            font-weight: 600;
+            letter-spacing: 0.10em;
+            text-transform: uppercase;
+            padding: 8px 20px;
+            border-radius: 20px;
+            margin-bottom: 32px;
+            backdrop-filter: blur(4px);
+        }
+
+        .brand-title {
+            color: #ffffff;
+            font-size: 3.6rem;
+            font-weight: 800;
+            line-height: 1.15;
+            margin-bottom: 28px;
+            text-shadow: 0 2px 12px rgba(0,0,0,0.40);
+        }
+
+        .brand-title span { color: #a5d6a7; }
+
+        .brand-mobile-icon { display: none; }
+
+        .brand-features {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            color: rgba(255,255,255,0.80);
+            font-size: 1rem;
+        }
+
+        .feature-icon {
+            width: 38px;
+            height: 38px;
+            background: rgba(165,214,167,0.18);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #a5d6a7;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+
+        /* ── Panel derecho: formulario ── */
+        .panel-form {
+            width: 45%;
+            background: #f8faf7;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 60px 52px;
+        }
+
+        .form-header {
+            text-align: center;
+        }
+
+        .form-header h2 {
+            color: #1b2e1b;
+            font-size: 1.65rem;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .form-header p {
+            color: #6b7c6b;
+            font-size: 0.90rem;
+            margin: 0 0 32px 0;
+        }
+
+        .form-label {
+            font-size: 0.80rem;
+            font-weight: 600;
+            color: #3a4f3a;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+
+        .input-wrapper { position: relative; }
+
+        .input-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #81a881;
+            font-size: 1rem;
+            pointer-events: none;
+        }
+
+        .form-control {
+            padding-left: 40px;
+            border: 1.5px solid #d4e0d4;
+            border-radius: 10px;
+            background: #fff;
+            color: #1b2e1b;
+            font-size: 0.95rem;
+            height: 48px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .form-control:focus {
+            border-color: #2e7d32;
+            box-shadow: 0 0 0 3px rgba(46,125,50,0.12);
+            outline: none;
+        }
+
+        .form-control::placeholder { color: #b0c4b0; }
+
+        .btn-ingresar {
+            height: 50px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #2e7d32, #388e3c);
+            border: none;
+            color: #fff;
+            font-weight: 700;
+            font-size: 0.95rem;
+            letter-spacing: 0.04em;
+            transition: transform 0.15s, box-shadow 0.15s;
+            box-shadow: 0 4px 14px rgba(46,125,50,0.30);
+        }
+
+        .btn-ingresar:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(46,125,50,0.40);
+            background: linear-gradient(135deg, #256427, #2e7d32);
+        }
+
+        .btn-ingresar:active { transform: translateY(0); }
+
+        .footer-note {
+            margin-top: 28px;
+            text-align: center;
+            font-size: 0.78rem;
+            color: #94a894;
+        }
+
+        /* Alertas */
+        .alert {
+            border-radius: 10px;
+            font-size: 0.88rem;
+            padding: 10px 14px;
+            border: none;
+            margin-bottom: 20px;
+        }
+        .alert-danger  { background: #fdecea; color: #b71c1c; }
+        .alert-warning { background: #fff8e1; color: #7a5800; }
+        .alert-success { background: #e8f5e9; color: #1b5e20; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            body { flex-direction: column; }
+
+            .panel-branding {
+                width: 100%;
+                min-height: unset;
+                height: 110px;
+                padding: 0 24px;
+                justify-content: center;
+                align-items: center;
+                flex-direction: row;
+                gap: 12px;
+            }
+
+            /* Ocultar badge y features, solo mostrar título */
+            .brand-badge,
+            .brand-features { display: none; }
+
+            .brand-title {
+                font-size: 1.65rem;
+                margin: 0;
+                white-space: nowrap;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+
+            /* Quitar el <br> en móvil poniendo el texto en una línea */
+            .brand-title br { display: none; }
+
+            .brand-mobile-icon {
+                display: inline;
+                color: #a5d6a7;
+                margin-right: 2px;
+                font-size: 1.4rem;
+            }
+
+            .panel-form {
+                width: 100%;
+                padding: 8px 24px 32px 24px;
+                flex: 1;
+            }
+
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ── Branding ── -->
+    <div class="panel-branding">
+        <div class="brand-badge">
+            <i class="bi bi-flower1"></i> Sistema Agrícola
+        </div>
+        <h1 class="brand-title"><i class="bi bi-cup-hot-fill brand-mobile-icon"></i>El Cafetero <br>de <span>Nufi</span></h1>
+        <div class="brand-features">
+            <div class="feature-item">
+                <div class="feature-icon"><i class="bi bi-box-seam"></i></div>
+                Control de inventario en tiempo real
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon"><i class="bi bi-cart3"></i></div>
+                Gestión de ventas y clientes
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon"><i class="bi bi-file-earmark-bar-graph"></i></div>
+                Reportes y estadísticas de producción
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Formulario ── -->
+    <div class="panel-form">
+        <div class="form-header">
+            <h2>Bienvenido</h2>
+            <p>Ingresa tus credenciales para acceder al sistema</p>
+        </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% for category, message in messages %}
-                <div class="alert alert-{{ category }}">{{ message }}</div>
+                <div class="alert alert-{{ category }}">
+                    <i class="bi bi-exclamation-circle me-1"></i> {{ message }}
+                </div>
             {% endfor %}
         {% endwith %}
 
         <form method="POST">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
             <div class="mb-3">
                 <label class="form-label">Correo electrónico</label>
-                <input type="email" name="email" class="form-control" required autofocus>
+                <div class="input-wrapper">
+                    <i class="bi bi-envelope input-icon"></i>
+                    <input type="email" name="email" class="form-control"
+                           placeholder="usuario@ejemplo.com" required autofocus>
+                </div>
             </div>
+
             <div class="mb-4">
                 <label class="form-label">Contraseña</label>
-                <input type="password" name="password" class="form-control" required>
+                <div class="input-wrapper">
+                    <i class="bi bi-lock input-icon"></i>
+                    <input type="password" name="password" class="form-control"
+                           placeholder="••••••••" required>
+                </div>
             </div>
-            <button type="submit" class="btn btn-success w-100">Ingresar</button>
+
+            <button type="submit" class="btn btn-ingresar w-100">
+                <i class="bi bi-box-arrow-in-right me-2"></i>Ingresar al sistema
+            </button>
         </form>
+
+        <div class="footer-note">
+            <i class="bi bi-shield-check me-1"></i>
+            Acceso restringido · Solo personal autorizado
+        </div>
     </div>
-</div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>

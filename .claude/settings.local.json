@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find C:UsersUsuariocafeteroNUFI -type f -name README* -o -name package.json -o -name requirements.txt -o -name setup.py -o -name .env* -o -name Dockerfile* -o -name docker-compose*)",
+      "Bash(git:*)",
+      "Bash(wc:*)"
+    ]
+  }
+}
