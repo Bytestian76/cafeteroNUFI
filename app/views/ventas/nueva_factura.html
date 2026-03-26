@@ -1,160 +1,594 @@
 {% extends 'base.html' %}
+<!-- ventas/nueva_factura.html — Formulario dinámico para crear una factura.
+   Secciones: selección de cliente (con link a nuevo cliente), líneas de productos
+   (dinámicas, se agregan/eliminan con JS), selector de IVA y total calculado en tiempo real.
+   JS clave:
+     CATALOGO: array de productos con precio y stock inyectado desde el servidor.
+     seleccionadosExcepto/sincronizarSelectores: evita duplicar productos en líneas.
+     actualizarStockHint: muestra disponibilidad de stock bajo el select.
+     calcularTotales: recalcula subtotales, IVA y total general al instante.
+     crearLinea/attachEvents: añade líneas de producto dinámicamente.
+   Lógica del servidor: nueva() en venta_controller.py línea 106. -->
 {% block title %}Nueva Factura · El Cafetero de Nufi{% endblock %}
+
+{% block styles %}
+<style>
+    /* ── Layout ── */
+    .dash-title { font-size: 1.5rem; font-weight: 700; color: #1a2e1a; margin: 0; }
+
+    /* ── Card de formulario ── */
+    .form-card {
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        border: 1px solid #e8f0e8;
+        overflow: hidden;
+    }
+    .form-card-header {
+        padding: 14px 24px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: #1a2e1a;
+        border-bottom: 1px solid #f0f4f0;
+        background: #fafcfa;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .form-card-header i { color: #2e7d32; }
+    .form-card-body { padding: 24px; }
+
+    /* ── Inputs ── */
+    .dash-label { font-size: 0.85rem; font-weight: 600; color: #3a4f3a; margin-bottom: 6px; display: block; }
+    .dash-input {
+        width: 100%;
+        border: 1.5px solid #d4e0d4;
+        border-radius: 9px;
+        padding: 8px 12px;
+        font-size: 0.88rem;
+        color: #1b2e1b;
+        background: #fff;
+        outline: none;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .dash-input:focus { border-color: #2e7d32; box-shadow: 0 0 0 3px rgba(46,125,50,0.10); }
+    .dash-input[readonly] { background: #f8faf7; color: #6b7c6b; cursor: default; }
+
+    /* ── Líneas de productos ── */
+    .linea-producto {
+        background: #fafcfa;
+        border: 1.5px solid #e8f0e8;
+        border-radius: 10px;
+        padding: 12px 16px;
+        margin-bottom: 10px;
+        display: grid;
+        grid-template-columns: 1fr 140px 150px 36px;
+        gap: 10px;
+        align-items: start;
+    }
+    .subtotal-val {
+        font-weight: 700;
+        color: #2e7d32;
+        font-size: 0.9rem;
+        text-align: center;
+    }
+
+    /* ── Card total ── */
+    .total-card {
+        background: linear-gradient(135deg, #2e7d32, #388e3c);
+        border-radius: 12px;
+        padding: 16px 24px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 4px 14px rgba(46,125,50,0.25);
+    }
+    .total-label { color: rgba(255,255,255,0.85); font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+    .total-valor { color: #fff; font-size: 1.6rem; font-weight: 800; }
+
+    /* ── Botones ── */
+    .btn-agregar {
+        padding: 7px 16px;
+        border-radius: 9px;
+        border: 1.5px solid #a5d6a7;
+        background: #e8f5e9;
+        color: #2e7d32;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex; align-items: center; gap: 6px;
+        transition: all 0.15s;
+    }
+    .btn-agregar:hover { background: #c8e6c9; border-color: #81c784; }
+    .btn-guardar {
+        padding: 11px 24px;
+        border-radius: 10px;
+        border: none;
+        background: linear-gradient(135deg, #2e7d32, #388e3c);
+        color: #fff;
+        font-size: 0.95rem;
+        font-weight: 700;
+        cursor: pointer;
+        width: 100%;
+        display: flex; align-items: center; justify-content: center; gap: 8px;
+        box-shadow: 0 4px 14px rgba(46,125,50,0.30);
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .btn-guardar:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(46,125,50,0.40); }
+    .btn-quitar {
+        width: 36px; height: 36px;
+        border-radius: 8px;
+        border: 1.5px solid #ffcdd2;
+        background: #fff;
+        color: #c62828;
+        cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 0.85rem;
+        transition: all 0.15s;
+        flex-shrink: 0;
+    }
+    .btn-quitar:hover { background: #fdecea; border-color: #ef9a9a; }
+    .btn-back {
+        width: 34px; height: 34px;
+        border-radius: 9px;
+        border: 1.5px solid #d4e0d4;
+        background: #fff;
+        color: #6b7c6b;
+        cursor: pointer;
+        display: inline-flex; align-items: center; justify-content: center;
+        text-decoration: none;
+        transition: all 0.15s;
+    }
+    .btn-back:hover { background: #f0f4f0; border-color: #a5d6a7; color: #2e7d32; }
+    .btn-nuevo-cliente {
+        padding: 8px 14px;
+        border-radius: 9px;
+        border: 1.5px solid #a5d6a7;
+        background: #e8f5e9;
+        color: #2e7d32;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex; align-items: center; gap: 5px;
+        transition: all 0.15s;
+        white-space: nowrap;
+    }
+    .btn-nuevo-cliente:hover { background: #c8e6c9; border-color: #81c784; color: #1b5e20; }
+
+    /* ── Col header de línea ── */
+    .linea-headers {
+        display: grid;
+        grid-template-columns: 1fr 140px 150px 36px;
+        gap: 10px;
+        padding: 0 16px;
+        margin-bottom: 6px;
+    }
+    .linea-col-label { font-size: 0.75rem; font-weight: 700; color: #6b7c6b; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    /* ── Stock hint ── */
+    .stock-hint {
+        font-size: 0.72rem;
+        margin-top: 4px;
+        display: none;
+    }
+    .stock-hint.ok     { color: #2e7d32; display: block; }
+    .stock-hint.warn   { color: #e65100; display: block; }
+    .stock-hint.danger { color: #c62828; display: block; font-weight: 600; }
+    .cantidad-input.over-stock { border-color: #c62828 !important; box-shadow: 0 0 0 3px rgba(198,40,40,0.10) !important; }
+
+    /* ── Animaciones ── */
+    .form-card { animation: facturaCardIn 0.38s ease both; }
+    @keyframes facturaCardIn {
+        from { opacity: 0; transform: translateY(14px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Línea nueva: fade + slide */
+    @keyframes lineaEntrar {
+        from { opacity: 0; transform: translateY(-10px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+    .linea-nueva { animation: lineaEntrar 0.22s ease forwards; }
+
+    /* Pulse en el total cuando cambia */
+    @keyframes totalPulse {
+        0%   { transform: scale(1); }
+        40%  { transform: scale(1.06); }
+        100% { transform: scale(1); }
+    }
+    .total-pulse { animation: totalPulse 0.3s ease; }
+
+    /* Shimmer en btn-guardar */
+    .btn-guardar { position: relative; overflow: hidden; }
+    .btn-guardar::before {
+        content: '';
+        position: absolute; top: 0; left: -100%;
+        width: 55%; height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.20), transparent);
+        transform: skewX(-18deg);
+        animation: shimGuardar 3s ease-in-out infinite;
+    }
+    @keyframes shimGuardar { 0% { left: -100%; } 55%, 100% { left: 160%; } }
+
+    /* ── Responsive ── */
+    @media (max-width: 575px) {
+        .linea-headers { display: none; }
+        .linea-producto { grid-template-columns: 1fr auto; }
+        .linea-producto > *:nth-child(1) { grid-column: 1 / 3; }
+        .linea-producto > *:nth-child(3) { display: none; }
+        .linea-producto > *:nth-child(4) { grid-column: 2; }
+        .total-card { flex-direction: column; align-items: flex-start; gap: 4px; }
+        .total-valor { font-size: 1.3rem; }
+    }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb-nav">
+    <a href="{{ url_for('ventas.listar') }}">Ventas</a>
+    <span class="bc-sep">›</span>
+    <span class="bc-current">Nueva factura</span>
+</nav>
+{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-md-8">
+    <div class="col-xl-8 col-lg-10">
 
-        <div class="d-flex align-items-center mb-4">
-            <a href="{{ url_for('ventas.listar') }}" class="btn btn-outline-secondary btn-sm me-3">
+        <!-- Encabezado -->
+        <div class="d-flex align-items-center gap-3 mb-4">
+            <a href="{{ url_for('ventas.listar') }}" class="btn-back">
                 <i class="bi bi-arrow-left"></i>
             </a>
-            <h3 class="fw-bold mb-0">Nueva Factura</h3>
-        </div>
-
-        <div class="card border-0 shadow-sm">
-            <div class="card-body p-4">
-                <form method="POST" id="facturaForm">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <!-- Cliente -->
-                    <div class="mb-4">
-                        <label class="form-label fw-semibold">Cliente</label>
-                        <div class="input-group">
-                            <select name="cliente_id" class="form-select" required>
-                                <option value="">Seleccionar cliente...</option>
-                                {% for c in clientes %}
-                                <option value="{{ c.id }}">{{ c.nombre }} — {{ c.documento or 'Sin documento' }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                            <a href="{{ url_for('ventas.nuevo_cliente') }}" class="btn btn-outline-success">
-                                <i class="bi bi-plus"></i> Nuevo
-                            </a>
-                        </div>
-                    </div>
-
-                    <!-- Líneas de productos -->
-                    <label class="form-label fw-semibold">Productos</label>
-                    <div id="lineas">
-                        <div class="linea row g-2 mb-2 align-items-center">
-                            <div class="col-md-6">
-                                <select name="producto_id[]" class="form-select producto-select" required>
-                                    <option value="">Seleccionar producto...</option>
-                                    {% for p in productos %}
-                                    <option value="{{ p.id }}" data-precio="{{ p.precio_unitario }}">
-                                        {{ p.nombre }} — ${{ "%.2f"|format(p.precio_unitario) }} / {{ p.unidad_medida }}
-                                    </option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-2">
-                                <input type="number" name="cantidad[]" class="form-control cantidad-input"
-                                    placeholder="Cantidad" step="0.01" min="0.01" required>
-                            </div>
-                            <div class="col-md-3">
-                                <input type="text" class="form-control subtotal-display bg-light" placeholder="Subtotal"
-                                    readonly>
-                            </div>
-                            <div class="col-md-1">
-                                <button type="button" class="btn btn-outline-danger btn-eliminar">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <button type="button" id="btnAgregarLinea" class="btn btn-outline-primary btn-sm mb-4">
-                        <i class="bi bi-plus"></i> Agregar producto
-                    </button>
-
-                    <!-- Total -->
-                    <div class="d-flex justify-content-end mb-4">
-                        <div class="card bg-success text-white px-4 py-2">
-                            <span class="fw-bold fs-5">Total: $<span id="totalGeneral">0.00</span></span>
-                        </div>
-                    </div>
-
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-warning btn-lg">
-                            <i class="bi bi-check-lg"></i> Guardar Factura
-                        </button>
-                    </div>
-
-                </form>
+            <div>
+                <h4 class="dash-title"><i class="bi bi-receipt me-2" style="color:#2e7d32"></i>Nueva Factura</h4>
+                <span style="font-size:0.82rem;color:#6b7c6b;">Registra una nueva venta con sus productos</span>
             </div>
         </div>
 
+        <form method="POST" id="facturaForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <!-- Sección cliente -->
+            <div class="form-card mb-4">
+                <div class="form-card-header">
+                    <i class="bi bi-person-fill"></i> Datos del cliente
+                </div>
+                <div class="form-card-body">
+                    <label class="dash-label">Cliente <span style="color:#c62828;">*</span></label>
+                    <div class="d-flex gap-2">
+                        <select name="cliente_id" class="dash-input" required style="flex:1;">
+                            <option value="">Seleccionar cliente...</option>
+                            {% for c in clientes %}
+                            <option value="{{ c.id }}" {{ 'selected' if c.id == cliente_cf_id }}>
+                                {{ c.nombre }}{% if c.documento %} — {{ c.documento }}{% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <a href="{{ url_for('ventas.nuevo_cliente', origen='nueva') }}" class="btn-nuevo-cliente">
+                            <i class="bi bi-plus"></i> Nuevo
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sección productos -->
+            <div class="form-card mb-4">
+                <div class="form-card-header">
+                    <i class="bi bi-bag-fill"></i> Productos
+                    <span style="color:#94a894;font-weight:400;font-size:0.78rem;margin-left:auto;">Al menos uno requerido</span>
+                </div>
+                <div class="form-card-body">
+
+                    <div class="linea-headers">
+                        <span class="linea-col-label">Producto</span>
+                        <span class="linea-col-label">Cantidad</span>
+                        <span class="linea-col-label" style="text-align:center;">Subtotal</span>
+                        <span></span>
+                    </div>
+
+                    <div id="lineas">
+                        <div class="linea-producto">
+                            <div>
+                                <select name="producto_id[]" class="dash-input producto-select" required></select>
+                                <div class="stock-hint" data-stock-hint></div>
+                            </div>
+                            <input type="number" name="cantidad[]" class="dash-input cantidad-input" placeholder="0.00" step="0.01" min="0.01" required>
+                            <div class="subtotal-val" data-subtotal>—</div>
+                            <button type="button" class="btn-quitar btn-eliminar">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="button" id="btnAgregarLinea" class="btn-agregar mt-1">
+                        <i class="bi bi-plus-lg"></i> Agregar producto
+                    </button>
+                </div>
+            </div>
+
+            <!-- IVA -->
+            <div class="mb-3" style="display:flex;align-items:center;gap:14px;background:#fafcfa;border:1.5px solid #e8f0e8;border-radius:10px;padding:12px 16px;">
+                <label class="dash-label mb-0" style="white-space:nowrap;">
+                    <i class="bi bi-percent me-1" style="color:#2e7d32;"></i> IVA
+                </label>
+                <select name="iva_porcentaje" id="ivaSelect" class="dash-input" style="max-width:160px;" onchange="calcularTotales()">
+                    <option value="0">0% — Exento</option>
+                    <option value="5">5%</option>
+                    <option value="19">19%</option>
+                </select>
+                <span id="ivaMonto" style="font-size:0.88rem;color:#6b7c6b;margin-left:auto;">IVA: $0.00</span>
+            </div>
+
+            <!-- Campaña activa (opcional) -->
+            {% if campana_activa %}
+            <div class="mb-3" style="display:flex;align-items:center;gap:12px;background:#f4f8f4;border:1.5px solid #d4e0d4;border-radius:10px;padding:12px 16px;">
+                <input type="checkbox" id="chkCampana" name="_asociar_campana" value="1" checked
+                    style="width:16px;height:16px;accent-color:#2e7d32;cursor:pointer;flex-shrink:0;"
+                    onchange="document.getElementById('inputCampanaId').disabled = !this.checked">
+                <input type="hidden" name="campana_id" id="inputCampanaId" value="{{ campana_activa.id }}">
+                <label for="chkCampana" style="margin:0;cursor:pointer;font-size:0.86rem;color:#3a4f3a;">
+                    <i class="bi bi-calendar2-range me-1" style="color:#2e7d32;"></i>
+                    Asociar a campaña <strong>{{ campana_activa.nombre }}</strong>
+                </label>
+            </div>
+            {% endif %}
+
+            <!-- Total -->
+            <div class="total-card mb-4">
+                <div>
+                    <div class="total-label">Total a cobrar</div>
+                    <small style="color:rgba(255,255,255,0.6);font-size:0.75rem;" id="subtotalLabel">Subtotal: $0.00</small>
+                </div>
+                <div class="total-valor">$<span id="totalGeneral">0.00</span></div>
+            </div>
+
+            <!-- Guardar -->
+            <button type="submit" class="btn-guardar">
+                <i class="bi bi-check-lg"></i> Guardar Factura
+            </button>
+
+        </form>
+
+        <!-- Espacio inferior -->
+        <div style="height: 2.5rem;"></div>
     </div>
 </div>
+
 {% endblock %}
+
+{% block modals %}
+<!-- ── MODAL ERROR DE STOCK ──────────────────────────────────────────────── -->
+<div class="modal fade" id="modalStockError" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0" style="border-radius:14px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.15);">
+            <div class="modal-header" style="background:#fdecea;border-bottom:1px solid #ffcdd2;">
+                <h6 class="modal-title fw-semibold" style="color:#c62828;">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>Stock insuficiente
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body py-4 px-4 text-center">
+                <p style="color:#6b7c6b;font-size:0.88rem;margin:0;">
+                    Una o más líneas superan el stock disponible.<br>
+                    Corrige las cantidades antes de guardar.
+                </p>
+            </div>
+            <div class="modal-footer justify-content-center border-0 pt-0 pb-4">
+                <button type="button" class="btn btn-danger btn-sm px-4" data-bs-dismiss="modal">Entendido</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}{# cierra block modals #}
 
 {% block scripts %}
 <script>
-    // Template de una línea de producto
-    const templateLinea = `
-        <div class="linea row g-2 mb-2 align-items-center">
-            <div class="col-md-6">
-                <select name="producto_id[]" class="form-select producto-select" required>
-                    <option value="">Seleccionar producto...</option>
-                    {% for p in productos %}
-                    <option value="{{ p.id }}" data-precio="{{ p.precio_unitario }}">
-                        {{ p.nombre }} — ${{ "%.2f"| format(p.precio_unitario) }} / {{ p.unidad_medida }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-2">
-                <input type="number" name="cantidad[]" class="form-control cantidad-input"
-                    placeholder="Cantidad" step="0.01" min="0.01" required>
-            </div>
-            <div class="col-md-3">
-                <input type="text" class="form-control subtotal-display bg-light"
-                    placeholder="Subtotal" readonly>
-            </div>
-            <div class="col-md-1">
-                <button type="button" class="btn btn-outline-danger btn-eliminar">
-                    <i class="bi bi-trash"></i>
-                </button>
-            </div>
-        </div>`;
+    /* Catálogo completo de productos (fuente de verdad) → incluye stock */
+    const CATALOGO = [
+        {% for p in productos %}
+        {
+            id:     "{{ p.id }}",
+            nombre: "{{ p.nombre }}",
+            precio: {{ p.precio_unitario }},
+            unidad: "{{ p.unidad_medida }}",
+            stock:  {{ p.stock_actual if p.stock_actual is not none else 'null' }}
+        },
+        {% endfor %}
+    ];
 
-    // Agregar línea
-    document.getElementById('btnAgregarLinea').addEventListener('click', () => {
-        document.getElementById('lineas').insertAdjacentHTML('beforeend', templateLinea);
-        attachEvents();
-    });
+    /* Devuelve los IDs de producto seleccionados en OTROS selectores */
+    function seleccionadosExcepto(selectActual) {
+        const usados = new Set();
+        document.querySelectorAll('.producto-select').forEach(sel => {
+            if (sel !== selectActual && sel.value) usados.add(sel.value);
+        });
+        return usados;
+    }
 
-    // Calcular subtotal y total
+    /* Reconstruye las opciones de un selector, ocultando los ya usados */
+    function actualizarOpciones(select) {
+        const usados   = seleccionadosExcepto(select);
+        const valorAct = select.value;
+
+        select.innerHTML = '<option value="">Seleccionar producto...</option>';
+        CATALOGO.forEach(p => {
+            if (usados.has(p.id)) return;
+            const opt = document.createElement('option');
+            opt.value            = p.id;
+            opt.dataset.precio   = p.precio;
+            opt.dataset.stock    = p.stock !== null ? p.stock : '';
+            opt.dataset.unidad   = p.unidad;
+            const stockLabel     = p.stock !== null ? `  ·  Stock: ${p.stock} ${p.unidad}` : '';
+            opt.textContent      = `${p.nombre} — $${parseFloat(p.precio).toLocaleString('es-CO', {minimumFractionDigits:2})} / ${p.unidad}${stockLabel}`;
+            if (p.id === valorAct) opt.selected = true;
+            select.appendChild(opt);
+        });
+    }
+
+    /* Actualiza TODOS los selectores */
+    function sincronizarSelectores() {
+        document.querySelectorAll('.producto-select').forEach(actualizarOpciones);
+    }
+
+    /* Actualiza el hint de stock debajo del select → conectado con calcularTotales() */
+    function actualizarStockHint(linea) {
+        const select   = linea.querySelector('.producto-select');
+        const cantInp  = linea.querySelector('.cantidad-input');
+        const hint     = linea.querySelector('[data-stock-hint]');
+        const opt      = select.selectedOptions[0];
+
+        if (!opt || !opt.value) {
+            hint.className = 'stock-hint';
+            hint.textContent = '';
+            cantInp.classList.remove('over-stock');
+            return;
+        }
+
+        const stockRaw = opt.dataset.stock;
+        const unidad   = opt.dataset.unidad || '';
+        const cantidad = parseFloat(cantInp.value) || 0;
+
+        if (stockRaw === '' || stockRaw === undefined) {
+            hint.className = 'stock-hint';
+            hint.textContent = '';
+            cantInp.classList.remove('over-stock');
+            return;
+        }
+
+        const stock = parseFloat(stockRaw);
+
+        if (stock === 0) {
+            hint.className = 'stock-hint danger';
+            hint.textContent = '⚠ Sin stock disponible';
+            cantInp.classList.add('over-stock');
+        } else if (cantidad > stock) {
+            hint.className = 'stock-hint danger';
+            hint.textContent = `⚠ Excede el stock disponible (${stock} ${unidad})`;
+            cantInp.classList.add('over-stock');
+        } else if (stock > 0 && stock <= 5) {
+            hint.className = 'stock-hint warn';
+            hint.textContent = `Stock bajo: ${stock} ${unidad} disponibles`;
+            cantInp.classList.remove('over-stock');
+        } else {
+            hint.className = 'stock-hint ok';
+            hint.textContent = `Disponible: ${stock} ${unidad}`;
+            cantInp.classList.remove('over-stock');
+        }
+    }
+
+    /* Calcular subtotales y total general → pulsa el valor al cambiar */
     function calcularTotales() {
         let total = 0;
-        document.querySelectorAll('.linea').forEach(linea => {
-            const select = linea.querySelector('.producto-select');
+        document.querySelectorAll('.linea-producto').forEach(linea => {
+            const select   = linea.querySelector('.producto-select');
             const cantidad = parseFloat(linea.querySelector('.cantidad-input').value) || 0;
-            const precio = parseFloat(select.selectedOptions[0]?.dataset.precio) || 0;
+            const precio   = parseFloat(select.selectedOptions[0]?.dataset.precio) || 0;
             const subtotal = cantidad * precio;
-            linea.querySelector('.subtotal-display').value = subtotal > 0 ? '$' + subtotal.toFixed(2) : '';
+            const el       = linea.querySelector('[data-subtotal]');
+            el.textContent = subtotal > 0
+                ? '$' + subtotal.toLocaleString('es-CO', {minimumFractionDigits:2, maximumFractionDigits:2})
+                : '—';
+            el.style.color = subtotal > 0 ? '#2e7d32' : '#bbb';
             total += subtotal;
+            actualizarStockHint(linea);
         });
-        document.getElementById('totalGeneral').textContent = total.toFixed(2);
+        // Calcular IVA y total final
+        const ivaPct   = parseFloat(document.getElementById('ivaSelect').value) || 0;
+        const ivaMonto = total * ivaPct / 100;
+        const totalFin = total + ivaMonto;
+        const fmt = n => n.toLocaleString('es-CO', {minimumFractionDigits:2, maximumFractionDigits:2});
+
+        document.getElementById('ivaMonto').textContent    = `IVA (${ivaPct}%): $${fmt(ivaMonto)}`;
+        document.getElementById('subtotalLabel').textContent = `Subtotal: $${fmt(total)}`;
+
+        const totalEl = document.getElementById('totalGeneral');
+        totalEl.textContent = fmt(totalFin);
+        // Pulse al actualizar
+        totalEl.classList.remove('total-pulse');
+        totalEl.offsetWidth;
+        totalEl.classList.add('total-pulse');
+        totalEl.addEventListener('animationend', () => totalEl.classList.remove('total-pulse'), { once: true });
     }
 
-    // Eliminar línea
-    function attachEvents() {
-        document.querySelectorAll('.btn-eliminar').forEach(btn => {
-            btn.onclick = function () {
-                const lineas = document.querySelectorAll('.linea');
-                if (lineas.length > 1) {
-                    this.closest('.linea').remove();
+    /* Crea una nueva línea de producto */
+    function crearLinea() {
+        const div = document.createElement('div');
+        div.className = 'linea-producto';
+        div.innerHTML = `
+            <div>
+                <select name="producto_id[]" class="dash-input producto-select" required></select>
+                <div class="stock-hint" data-stock-hint></div>
+            </div>
+            <input type="number" name="cantidad[]" class="dash-input cantidad-input" placeholder="0.00" step="0.01" min="0.01" required>
+            <div class="subtotal-val" data-subtotal>—</div>
+            <button type="button" class="btn-quitar btn-eliminar"><i class="bi bi-trash"></i></button>
+        `;
+        return div;
+    }
+
+    /* Vincular eventos a los elementos de una línea */
+    function attachEvents(contenedor) {
+        contenedor.querySelector('.btn-eliminar').addEventListener('click', function() {
+            const linea = this.closest('.linea-producto');
+            if (document.querySelectorAll('.linea-producto').length > 1) {
+                // Fade-out antes de eliminar
+                linea.style.transition = 'opacity 0.18s ease, transform 0.18s ease';
+                linea.style.opacity    = '0';
+                linea.style.transform  = 'translateY(-8px)';
+                setTimeout(function() {
+                    linea.remove();
+                    sincronizarSelectores();
                     calcularTotales();
-                }
-            };
+                }, 190);
+            }
         });
-        document.querySelectorAll('.producto-select, .cantidad-input').forEach(el => {
-            el.addEventListener('change', calcularTotales);
-            el.addEventListener('input', calcularTotales);
+        contenedor.querySelector('.producto-select').addEventListener('change', () => {
+            sincronizarSelectores();
+            calcularTotales();
         });
+        contenedor.querySelector('.cantidad-input').addEventListener('input', calcularTotales);
     }
 
-    attachEvents();
+    /* Inicializar primera línea */
+    document.querySelectorAll('.linea-producto').forEach(linea => {
+        actualizarOpciones(linea.querySelector('.producto-select'));
+        attachEvents(linea);
+    });
+
+    /* Agregar nueva línea */
+    document.getElementById('btnAgregarLinea').addEventListener('click', () => {
+        const libres = CATALOGO.filter(p =>
+            ![...document.querySelectorAll('.producto-select')].some(s => s.value === p.id)
+        );
+        if (libres.length === 0) return;
+
+        const linea = crearLinea();
+        linea.classList.add('linea-nueva');
+        document.getElementById('lineas').appendChild(linea);
+        linea.addEventListener('animationend', () => linea.classList.remove('linea-nueva'), { once: true });
+        actualizarOpciones(linea.querySelector('.producto-select'));
+        attachEvents(linea);
+    });
+
+    /* Validación al enviar: bloquear si alguna cantidad excede el stock */
+    document.getElementById('facturaForm').addEventListener('submit', function(e) {
+        let hayError = false;
+        document.querySelectorAll('.linea-producto').forEach(linea => {
+            const select   = linea.querySelector('.producto-select');
+            const cantInp  = linea.querySelector('.cantidad-input');
+            const opt      = select.selectedOptions[0];
+            if (!opt || !opt.value) return;
+            const stockRaw = opt.dataset.stock;
+            if (stockRaw === '' || stockRaw === undefined) return;
+            const stock    = parseFloat(stockRaw);
+            const cantidad = parseFloat(cantInp.value) || 0;
+            if (cantidad > stock) hayError = true;
+        });
+        if (hayError) {
+            e.preventDefault();
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('modalStockError')).show();
+        }
+    });
 </script>
 {% endblock %}

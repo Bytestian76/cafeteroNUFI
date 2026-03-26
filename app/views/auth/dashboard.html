@@ -1,89 +1,1023 @@
 {% extends 'base.html' %}
+<!-- dashboard.html — Panel de control principal.
+   Muestra: alerta de stock mínimo, 4 KPIs del mes, selector de rango de fechas,
+   3 gráficas (ventas/día, productos top, movimientos) cargadas por AJAX desde
+   /dashboard/datos (auth_controller.py línea 100), tabla últimas 5 ventas y acceso rápido.
+   JS: Chart.js, animaciones de entrada en cascada, contador animado de KPIs. -->
 {% block title %}Dashboard · El Cafetero de Nufi{% endblock %}
 
+{% block styles %}
+<style>
+    /* ── Layout general ── */
+    .dash-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; }
+    .dash-title  { font-size: 1.5rem; font-weight: 700; color: #1a2e1a; margin: 0; }
+    .dash-date   { font-size: 0.82rem; color: #6b7c6b; }
+
+    /* ── KPI Cards ── */
+    .kpi-card {
+        background: #fff;
+        border-radius: 14px;
+        padding: 20px 22px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        border: 1px solid #e8f0e8;
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.09); }
+    a.kpi-card { text-decoration: none; cursor: pointer; }
+    a.kpi-card .kpi-label::after { content: ' →'; font-size: 0.7rem; opacity: 0; transition: opacity 0.15s; }
+    a.kpi-card:hover .kpi-label::after { opacity: 1; }
+    .kpi-icon {
+        width: 48px; height: 48px;
+        border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.4rem; flex-shrink: 0;
+    }
+    .kpi-green { background: #e8f5e9; color: #2e7d32; }
+    .kpi-blue  { background: #e3f2fd; color: #1565c0; }
+    .kpi-teal  { background: #e0f2f1; color: #00695c; }
+    .kpi-red   { background: #fce4ec; color: #c62828; }
+    .kpi-value { font-size: 1.55rem; font-weight: 800; color: #1a2e1a; line-height: 1; }
+    .kpi-label { font-size: 0.78rem; color: #6b7c6b; margin-top: 4px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
+
+    /* ── Alerta stock ── */
+    .stock-alert {
+        background: #fdecea;
+        border-left: 4px solid #e53935;
+        border-radius: 0 10px 10px 0;
+        padding: 12px 18px;
+        font-size: 0.88rem;
+        color: #b71c1c;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+    }
+    .alert-chip {
+        background: rgba(229,57,53,0.10);
+        border: 1px solid rgba(229,57,53,0.25);
+        border-radius: 20px;
+        padding: 2px 10px;
+        font-size: 0.80rem;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    /* ── Chart cards ── */
+    .chart-card {
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        border: 1px solid #e8f0e8;
+        overflow: hidden;
+    }
+    .chart-card-header {
+        padding: 14px 20px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: #1a2e1a;
+        border-bottom: 1px solid #f0f4f0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #fafcfa;
+    }
+    .chart-card-header i { color: #2e7d32; font-size: 1rem; }
+    .chart-subtitle { font-weight: 400; color: #94a894; font-size: 0.78rem; margin-left: auto; }
+    .chart-card-body { padding: 20px; }
+
+    /* ── Controles de rango ── */
+    .chart-controls {
+        background: #fff;
+        border-radius: 12px;
+        border: 1px solid #e8f0e8;
+        padding: 12px 18px;
+        box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+    }
+    .ctrl-label { font-size: 0.82rem; font-weight: 600; color: #3a4f3a; white-space: nowrap; }
+    .dash-input {
+        border: 1.5px solid #d4e0d4;
+        border-radius: 8px;
+        padding: 5px 10px;
+        font-size: 0.85rem;
+        color: #1b2e1b;
+        background: #fff;
+        outline: none;
+        transition: border-color 0.2s;
+    }
+    .dash-input:focus { border-color: #2e7d32; box-shadow: 0 0 0 3px rgba(46,125,50,0.10); }
+    .btn-rango {
+        padding: 5px 14px;
+        border-radius: 8px;
+        border: 1.5px solid #d4e0d4;
+        background: #fff;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #3a4f3a;
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+    .btn-rango:hover, .btn-rango.active {
+        background: #2e7d32;
+        border-color: #2e7d32;
+        color: #fff;
+    }
+    .btn-aplicar {
+        padding: 5px 16px;
+        border-radius: 8px;
+        border: none;
+        background: linear-gradient(135deg, #2e7d32, #388e3c);
+        color: #fff;
+        font-size: 0.82rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.15s, box-shadow 0.15s;
+        box-shadow: 0 2px 8px rgba(46,125,50,0.25);
+    }
+    .btn-aplicar:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(46,125,50,0.35); }
+
+    /* ── Tabla últimas ventas ── */
+    .dash-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    .dash-table thead tr { border-bottom: 2px solid #e8f0e8; }
+    .dash-table th { padding: 10px 16px; font-size: 0.75rem; font-weight: 700; color: #6b7c6b; text-transform: uppercase; letter-spacing: 0.05em; text-align: center; }
+    .dash-table tbody tr { border-bottom: 1px solid #f4f8f4; transition: background 0.12s; }
+    .dash-table tbody tr:last-child { border-bottom: none; }
+    .dash-table tbody tr:hover { background: #f8faf7; }
+    .dash-table td { padding: 11px 16px; color: #2a3d2a; vertical-align: middle; text-align: center; }
+
+    /* ── Acceso rápido ── */
+    .quick-links { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .quick-link {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 11px 14px;
+        border-radius: 10px;
+        background: #f8faf7;
+        border: 1.5px solid #e4ede4;
+        color: #2a3d2a;
+        font-size: 0.86rem;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.15s;
+    }
+    .quick-link i { color: #2e7d32; font-size: 1.05rem; }
+    .quick-link:hover { background: #e8f5e9; border-color: #a5d6a7; color: #1a2e1a; transform: translateY(-1px); }
+
+    /* ── Estado vacío ── */
+    .no-data {
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        height: 140px; color: #94a894; font-size: 0.88rem; gap: 8px;
+    }
+    .no-data i { font-size: 2rem; opacity: 0.4; }
+
+    /* ── Banner campaña activa ── */
+    .campana-banner {
+        background: linear-gradient(135deg, #1b5e20, #2e7d32);
+        border-radius: 12px;
+        padding: 14px 20px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        box-shadow: 0 2px 10px rgba(46,125,50,0.20);
+    }
+    .campana-banner-icon { font-size: 1.4rem; color: #a5d6a7; flex-shrink: 0; }
+    .campana-banner-nombre { font-weight: 700; color: #fff; font-size: 0.92rem; }
+    .campana-banner-sub { font-size: 0.78rem; color: rgba(255,255,255,0.70); margin-top: 1px; }
+    .campana-banner-link {
+        margin-left: auto;
+        padding: 5px 14px;
+        border-radius: 8px;
+        border: 1.5px solid rgba(165,214,167,0.45);
+        background: rgba(255,255,255,0.10);
+        color: #c8e6c9;
+        font-size: 0.82rem;
+        font-weight: 600;
+        text-decoration: none;
+        white-space: nowrap;
+        transition: background 0.15s;
+    }
+    .campana-banner-link:hover { background: rgba(255,255,255,0.20); color: #fff; }
+
+    /* ── Pulse alerta de escasez ── */
+    @keyframes alertPulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(229,57,53,0.30); }
+        50%       { box-shadow: 0 0 0 8px rgba(229,57,53,0); }
+    }
+    .stock-alert { animation: alertPulse 2.6s ease-in-out infinite; }
+
+    /* ── Bloque de contraste entre campañas ── */
+    .contraste-card {
+        background: #fff;
+        border-radius: 14px;
+        border: 1px solid #e8f0e8;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        overflow: hidden;
+    }
+    .contraste-header {
+        padding: 14px 24px;
+        background: #fafcfa;
+        border-bottom: 1px solid #f0f4f0;
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: #1a2e1a;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .contraste-header i { color: #2e7d32; }
+    .contraste-body { padding: 20px 24px 24px; }
+
+    /* Tabla de comparación */
+    .cc-table { width: 100%; border-collapse: collapse; }
+    .cc-table thead th {
+        padding: 10px 14px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #6b7c6b;
+        border-bottom: 2px solid #e8f0e8;
+    }
+    .cc-table thead th:not(:first-child) { text-align: right; }
+    .cc-table tbody tr { border-bottom: 1px solid #f4f8f4; }
+    .cc-table tbody tr:last-child { border-bottom: none; }
+    .cc-table tbody tr:hover { background: #fafcfa; }
+    .cc-table td {
+        padding: 13px 14px;
+        font-size: 0.86rem;
+        vertical-align: middle;
+    }
+    .cc-table td:not(:first-child) { text-align: right; }
+    .cc-metric-label {
+        font-weight: 600;
+        color: #3a4f3a;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .cc-metric-icon {
+        width: 28px; height: 28px;
+        border-radius: 8px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 0.8rem;
+        flex-shrink: 0;
+    }
+    .cc-val {
+        font-weight: 700;
+        color: #1a2e1a;
+        font-size: 0.9rem;
+    }
+    .cc-val.positivo { color: #2e7d32; }
+    .cc-val.negativo { color: #c62828; }
+    .cc-trend {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 2px 7px;
+        border-radius: 20px;
+        margin-left: 6px;
+        vertical-align: middle;
+    }
+    .cc-trend.up   { background: #e8f5e9; color: #2e7d32; }
+    .cc-trend.down { background: #fdecea; color: #c62828; }
+    .cc-trend.eq   { background: #f0f4f0; color: #6b7c6b; }
+
+    .dot-c { width:8px; height:8px; border-radius:50%; display:inline-block; flex-shrink:0; }
+    .dot-c.cerrada { background:#94a894; }
+    .dot-c.activa  { background:#2e7d32; }
+    .badge-cerrada {
+        font-size: 0.7rem; padding: 2px 8px; border-radius: 20px;
+        background: #f0f4f0; color: #6b7c6b; font-weight: 600;
+        display: inline-flex; align-items: center; gap: 4px;
+    }
+    .badge-activa {
+        font-size: 0.7rem; padding: 2px 8px; border-radius: 20px;
+        background: #e8f5e9; color: #2e7d32; font-weight: 600;
+        display: inline-flex; align-items: center; gap: 4px;
+    }
+
+    /* ── Responsive dashboard ── */
+    @media (max-width: 767px) {
+        .chart-controls .d-flex { flex-direction: column; align-items: flex-start !important; gap: 10px !important; }
+        .chart-controls .d-flex > .d-flex { width: 100%; flex-wrap: wrap; }
+        .chart-controls .dash-input { flex: 1; min-width: 0; }
+        .btn-rango { flex: 1; text-align: center; }
+        .quick-links { grid-template-columns: 1fr 1fr; }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h3 class="fw-bold">
-        <i class="bi bi-speedometer2"></i> Dashboard
-    </h3>
-    <span class="text-muted">Bienvenido, <strong>{{ current_user.nombre }}</strong></span>
+
+<!-- Header -->
+<div class="dash-header">
+    <div>
+        <h4 class="dash-title"><i class="bi bi-speedometer2 me-2" style="color:#2e7d32"></i>Dashboard</h4>
+        <span class="dash-date">Bienvenido, <strong>{{ current_user.nombre }}</strong> · {{ fin_default }}</span>
+    </div>
 </div>
 
-<!-- Alertas de escasez -->
-{% if elementos_alerta %}
-<div class="alert alert-danger alert-dismissible fade show mb-4" role="alert">
-    <i class="bi bi-exclamation-triangle-fill me-2"></i>
-    <strong>⚠️ Alerta de escasez:</strong> Los siguientes elementos están por debajo del stock mínimo:
-    <ul class="mb-0 mt-2">
-        {% for e in elementos_alerta %}
-        <li>
-            <strong>{{ e.nombre }}</strong> — Stock actual:
-            <span class="text-danger fw-bold">{{ e.stock_actual }} {{ e.unidad_medida }}</span>
-            (mínimo: {{ e.stock_minimo }} {{ e.unidad_medida }})
-        </li>
-        {% endfor %}
-    </ul>
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+<!-- Banner campaña activa -->
+{% if campana_activa %}
+<div class="campana-banner mb-4">
+    <i class="bi bi-broadcast-pin campana-banner-icon"></i>
+    <div>
+        <div class="campana-banner-nombre">{{ campana_activa.nombre }}</div>
+        <div class="campana-banner-sub">
+            Activa desde {{ campana_activa.fecha_inicio.strftime('%d/%m/%Y') }}
+            &nbsp;·&nbsp; {{ campana_activa.movimientos|length }} movimientos
+            &nbsp;·&nbsp; {{ campana_activa.ventas|length }} ventas
+            &nbsp;·&nbsp; Balance: ${{ '{:,.0f}'.format(campana_activa.balance) }}
+        </div>
+    </div>
+    <a href="{{ url_for('campanas.detalle', id=campana_activa.id) }}" class="campana-banner-link">
+        Ver detalle <i class="bi bi-arrow-right ms-1"></i>
+    </a>
 </div>
 {% endif %}
 
-<!-- Cards de módulos -->
-<div class="row g-4">
-
-    <div class="col-md-4">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body text-center p-4">
-                <i class="bi bi-box-seam fs-1 text-success"></i>
-                <h5 class="mt-2">Inventario</h5>
-                <p class="text-muted small">Gestiona elementos, stock y categorías</p>
-                <a href="{{ url_for('inventario.listar') }}" class="btn btn-outline-success btn-sm">Ver inventario</a>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-4">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body text-center p-4">
-                <i class="bi bi-arrow-left-right fs-1 text-primary"></i>
-                <h5 class="mt-2">Movimientos</h5>
-                <p class="text-muted small">Registra entradas y salidas</p>
-                <a href="{{ url_for('movimientos.historial') }}" class="btn btn-outline-primary btn-sm">Ver movimientos</a>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-4">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body text-center p-4">
-                <i class="bi bi-cart3 fs-1 text-warning"></i>
-                <h5 class="mt-2">Ventas</h5>
-                <p class="text-muted small">Clientes, facturas y totales</p>
-                <a href="{{ url_for('ventas.listar') }}" class="btn btn-outline-warning btn-sm">Ver ventas</a>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-4">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body text-center p-4">
-                <i class="bi bi-bag fs-1 text-secondary"></i>
-                <h5 class="mt-2">Productos</h5>
-                <p class="text-muted small">Catálogo de productos comercializables</p>
-                <a href="{{ url_for('productos.listar') }}" class="btn btn-outline-secondary btn-sm">Ver productos</a>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-4">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body text-center p-4">
-                <i class="bi bi-people fs-1 text-danger"></i>
-                <h5 class="mt-2">Usuarios</h5>
-                <p class="text-muted small">Gestión de accesos al sistema</p>
-                <a href="{{ url_for('auth.listar_usuarios') }}" class="btn btn-outline-danger btn-sm">Ver usuarios</a>
-            </div>
-        </div>
-    </div>
-
+<!-- Alerta de escasez -->
+{% if elementos_alerta %}
+<div class="stock-alert mb-4">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+    <strong>{{ elementos_alerta|length }} elemento(s) bajo stock mínimo:</strong>
+    {% for e in elementos_alerta %}
+        <span class="alert-chip">{{ e.nombre }} — {{ e.stock_actual }} {{ e.unidad_medida }}</span>
+    {% endfor %}
 </div>
+{% endif %}
+
+<!-- KPI Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3">
+        <a href="{{ url_for('ventas.listar') }}?fecha_desde={{ inicio_mes }}&fecha_hasta={{ fin_default }}" class="kpi-card">
+            <div class="kpi-icon kpi-green"><i class="bi bi-cash-coin"></i></div>
+            <div>
+                <div class="kpi-value">${{ "{:,.0f}".format(total_mes) }}</div>
+                <div class="kpi-label">Ventas del mes</div>
+            </div>
+        </a>
+    </div>
+    <div class="col-6 col-xl-3">
+        <a href="{{ url_for('ventas.listar') }}?fecha_desde={{ inicio_mes }}&fecha_hasta={{ fin_default }}" class="kpi-card">
+            <div class="kpi-icon kpi-blue"><i class="bi bi-receipt"></i></div>
+            <div>
+                <div class="kpi-value">{{ num_ventas_mes }}</div>
+                <div class="kpi-label">Facturas del mes</div>
+            </div>
+        </a>
+    </div>
+    <div class="col-6 col-xl-3">
+        <a href="{{ url_for('ventas.listar_clientes') }}" class="kpi-card">
+            <div class="kpi-icon kpi-teal"><i class="bi bi-people"></i></div>
+            <div>
+                <div class="kpi-value">{{ total_clientes }}</div>
+                <div class="kpi-label">Clientes registrados</div>
+            </div>
+        </a>
+    </div>
+    <div class="col-6 col-xl-3">
+        <a href="{{ url_for('inventario.listar') }}?alerta=1" class="kpi-card">
+            <div class="kpi-icon kpi-red"><i class="bi bi-exclamation-triangle"></i></div>
+            <div>
+                <div class="kpi-value">{{ elementos_alerta|length }}</div>
+                <div class="kpi-label">Alertas inventario</div>
+            </div>
+        </a>
+    </div>
+</div>
+
+<!-- Contraste campañas -->
+{% if contraste_izq and contraste_der %}
+{# Variables de tendencia para cada métrica #}
+{% set trend_costo   = 'down' if contraste_der.costo_total   < contraste_izq.costo_total   else ('up' if contraste_der.costo_total > contraste_izq.costo_total else 'eq') %}
+{% set trend_ingreso = 'up'   if contraste_der.ingreso_ventas > contraste_izq.ingreso_ventas else ('down' if contraste_der.ingreso_ventas < contraste_izq.ingreso_ventas else 'eq') %}
+{% set trend_balance = 'up'   if contraste_der.balance        > contraste_izq.balance        else ('down' if contraste_der.balance < contraste_izq.balance else 'eq') %}
+{% set trend_ventas  = 'up'   if contraste_der.ventas|length  > contraste_izq.ventas|length  else ('down' if contraste_der.ventas|length < contraste_izq.ventas|length else 'eq') %}
+{% set trend_movs    = 'up'   if contraste_der.movimientos|length > contraste_izq.movimientos|length else ('down' if contraste_der.movimientos|length < contraste_izq.movimientos|length else 'eq') %}
+
+<div class="contraste-card mb-4">
+    <div class="contraste-header">
+        <i class="bi bi-bar-chart-steps"></i>
+        Contraste de campañas
+        <div class="d-flex align-items-center gap-2 ms-auto">
+            <span class="badge-cerrada"><span class="dot-c cerrada"></span>{{ contraste_izq.nombre }}</span>
+            {% if contraste_der_es_activa %}
+            <span class="badge-activa"><span class="dot-c activa"></span>{{ contraste_der.nombre }}</span>
+            {% else %}
+            <span class="badge-cerrada"><span class="dot-c cerrada"></span>{{ contraste_der.nombre }}</span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="contraste-body">
+        <div class="row g-4">
+
+            <!-- Tabla comparativa -->
+            <div class="col-lg-7">
+                <table class="cc-table">
+                    <thead>
+                        <tr>
+                            <th style="width:36%">Métrica</th>
+                            <th><span class="dot-c cerrada me-1"></span>{{ contraste_izq.nombre|truncate(18,true,'…') }}</th>
+                            <th>
+                                <span class="dot-c {% if contraste_der_es_activa %}activa{% else %}cerrada{% endif %} me-1"></span>{{ contraste_der.nombre|truncate(18,true,'…') }}
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="cc-metric-label"><span class="cc-metric-icon" style="background:#e3f2fd;color:#1565c0"><i class="bi bi-arrow-down-circle"></i></span>Costos</span></td>
+                            <td><span class="cc-val">${{ '{:,.0f}'.format(contraste_izq.costo_total) }}</span></td>
+                            <td>
+                                <span class="cc-val">${{ '{:,.0f}'.format(contraste_der.costo_total) }}</span>
+                                <span class="cc-trend {{ trend_costo }}">
+                                    <i class="bi bi-arrow-{% if trend_costo=='up' %}up{% elif trend_costo=='down' %}down{% else %}dash{% endif %}"></i>
+                                    {% if trend_costo != 'eq' %}{{ '{:,.0f}'.format((contraste_der.costo_total - contraste_izq.costo_total)|abs) | replace(',','.') }}{% else %}igual{% endif %}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><span class="cc-metric-label"><span class="cc-metric-icon" style="background:#e8f5e9;color:#2e7d32"><i class="bi bi-arrow-up-circle"></i></span>Ingresos</span></td>
+                            <td><span class="cc-val">${{ '{:,.0f}'.format(contraste_izq.ingreso_ventas) }}</span></td>
+                            <td>
+                                <span class="cc-val">${{ '{:,.0f}'.format(contraste_der.ingreso_ventas) }}</span>
+                                <span class="cc-trend {{ trend_ingreso }}">
+                                    <i class="bi bi-arrow-{% if trend_ingreso=='up' %}up{% elif trend_ingreso=='down' %}down{% else %}dash{% endif %}"></i>
+                                    {% if trend_ingreso != 'eq' %}{{ '{:,.0f}'.format((contraste_der.ingreso_ventas - contraste_izq.ingreso_ventas)|abs) | replace(',','.') }}{% else %}igual{% endif %}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><span class="cc-metric-label"><span class="cc-metric-icon" style="background:#f3e5f5;color:#6a1b9a"><i class="bi bi-graph-up"></i></span>Balance</span></td>
+                            <td><span class="cc-val {% if contraste_izq.balance >= 0 %}positivo{% else %}negativo{% endif %}">{% if contraste_izq.balance >= 0 %}+{% endif %}${{ '{:,.0f}'.format(contraste_izq.balance) }}</span></td>
+                            <td>
+                                <span class="cc-val {% if contraste_der.balance >= 0 %}positivo{% else %}negativo{% endif %}">{% if contraste_der.balance >= 0 %}+{% endif %}${{ '{:,.0f}'.format(contraste_der.balance) }}</span>
+                                <span class="cc-trend {{ trend_balance }}">
+                                    <i class="bi bi-arrow-{% if trend_balance=='up' %}up{% elif trend_balance=='down' %}down{% else %}dash{% endif %}"></i>
+                                    {% if trend_balance != 'eq' %}{{ '{:,.0f}'.format((contraste_der.balance - contraste_izq.balance)|abs) | replace(',','.') }}{% else %}igual{% endif %}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><span class="cc-metric-label"><span class="cc-metric-icon" style="background:#e0f2f1;color:#00695c"><i class="bi bi-receipt"></i></span>Ventas</span></td>
+                            <td><span class="cc-val">{{ contraste_izq.ventas|length }}</span></td>
+                            <td>
+                                <span class="cc-val">{{ contraste_der.ventas|length }}</span>
+                                <span class="cc-trend {{ trend_ventas }}">
+                                    <i class="bi bi-arrow-{% if trend_ventas=='up' %}up{% elif trend_ventas=='down' %}down{% else %}dash{% endif %}"></i>
+                                    {% if trend_ventas != 'eq' %}{{ (contraste_der.ventas|length - contraste_izq.ventas|length)|abs }}{% else %}igual{% endif %}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><span class="cc-metric-label"><span class="cc-metric-icon" style="background:#fff3e0;color:#e65100"><i class="bi bi-box-seam"></i></span>Movimientos</span></td>
+                            <td><span class="cc-val">{{ contraste_izq.movimientos|length }}</span></td>
+                            <td>
+                                <span class="cc-val">{{ contraste_der.movimientos|length }}</span>
+                                <span class="cc-trend {{ trend_movs }}">
+                                    <i class="bi bi-arrow-{% if trend_movs=='up' %}up{% elif trend_movs=='down' %}down{% else %}dash{% endif %}"></i>
+                                    {% if trend_movs != 'eq' %}{{ (contraste_der.movimientos|length - contraste_izq.movimientos|length)|abs }}{% else %}igual{% endif %}
+                                </span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="d-flex gap-2 mt-4">
+                    <a href="{{ url_for('campanas.detalle', id=contraste_izq.id) }}"
+                       style="font-size:0.8rem;color:#6b7c6b;text-decoration:none;border:1.5px solid #d4e0d4;border-radius:8px;padding:5px 14px;font-weight:600;">
+                        <i class="bi bi-archive me-1"></i>{{ contraste_izq.nombre|truncate(22,true,'…') }}
+                    </a>
+                    <a href="{{ url_for('campanas.detalle', id=contraste_der.id) }}"
+                       style="font-size:0.8rem;color:#fff;text-decoration:none;background:{% if contraste_der_es_activa %}#2e7d32{% else %}#546e5e{% endif %};border-radius:8px;padding:5px 14px;font-weight:600;">
+                        {% if contraste_der_es_activa %}<i class="bi bi-broadcast-pin me-1"></i>{% else %}<i class="bi bi-archive me-1"></i>{% endif %}{{ contraste_der.nombre|truncate(22,true,'…') }}
+                    </a>
+                </div>
+            </div>
+
+            <!-- Gráfica -->
+            <div class="col-lg-5" style="min-height:280px;">
+                <canvas id="chartContraste" style="width:100%;height:100%;"
+                    data-label-c="{{ contraste_izq.nombre|truncate(28,true,'…') }}"
+                    data-costo-c="{{ contraste_izq.costo_total }}"
+                    data-ingreso-c="{{ contraste_izq.ingreso_ventas }}"
+                    data-balance-c="{{ contraste_izq.balance }}"
+                    data-label-a="{{ contraste_der.nombre|truncate(28,true,'…') }}"
+                    data-costo-a="{{ contraste_der.costo_total }}"
+                    data-ingreso-a="{{ contraste_der.ingreso_ventas }}"
+                    data-balance-a="{{ contraste_der.balance }}"
+                    data-color-a="{{ '#2e7d32' if contraste_der_es_activa else '#94a894' }}"
+                    data-border-a="{{ '#2e7d32' if contraste_der_es_activa else '#6b7c6b' }}"
+                ></canvas>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Controles de rango -->
+<div class="chart-controls mb-4">
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+        <span class="ctrl-label"><i class="bi bi-calendar3 me-1"></i>Rango de fechas</span>
+        <div class="d-flex gap-2 align-items-center">
+            <input type="date" id="fechaInicio" class="dash-input"
+                   value="{{ inicio_default }}" max="{{ fin_default }}">
+            <span style="color:#94a894">→</span>
+            <input type="date" id="fechaFin" class="dash-input"
+                   value="{{ fin_default }}" max="{{ fin_default }}">
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn-rango" data-dias="7">7 días</button>
+            <button class="btn-rango active" data-dias="30">30 días</button>
+            <button class="btn-rango" data-dias="90">90 días</button>
+        </div>
+        <button class="btn-aplicar" id="btnAplicar">
+            <i class="bi bi-arrow-clockwise me-1"></i>Aplicar
+        </button>
+        <span id="cargando" style="font-size:0.82rem;color:#94a894;display:none;">
+            <i class="bi bi-hourglass-split"></i> Cargando...
+        </span>
+    </div>
+</div>
+
+<!-- Gráfica principal: ventas en el tiempo -->
+<div class="chart-card mb-4">
+    <div class="chart-card-header">
+        <i class="bi bi-graph-up-arrow"></i> Ventas en el tiempo
+        <span class="chart-subtitle" id="subtituloRango"></span>
+    </div>
+    <div class="chart-card-body">
+        <div id="sinVentas" class="no-data" style="display:none;">
+            <i class="bi bi-bar-chart-line"></i>
+            <span>Sin ventas en el período seleccionado</span>
+        </div>
+        <canvas id="chartVentas"></canvas>
+    </div>
+</div>
+
+<!-- Gráficas secundarias -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-6">
+        <div class="chart-card h-100">
+            <div class="chart-card-header"><i class="bi bi-bag"></i> Productos más vendidos</div>
+            <div class="chart-card-body">
+                <div id="sinProductos" class="no-data" style="display:none;">
+                    <i class="bi bi-bag-x"></i>
+                    <span>Sin datos en el período</span>
+                </div>
+                <canvas id="chartProductos"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="chart-card h-100">
+            <div class="chart-card-header"><i class="bi bi-arrow-left-right"></i> Movimientos de inventario</div>
+            <div class="chart-card-body">
+                <div id="sinMovimientos" class="no-data" style="display:none;">
+                    <i class="bi bi-arrow-left-right"></i>
+                    <span>Sin movimientos en el período</span>
+                </div>
+                <canvas id="chartMovimientos"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Últimas ventas + acceso rápido -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-8">
+        <div class="chart-card">
+            <div class="chart-card-header"><i class="bi bi-clock-history"></i> Últimas ventas registradas</div>
+            <div class="chart-card-body p-0">
+                <div class="table-scroll">
+                <table class="dash-table" style="min-width:400px;">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Fecha</th>
+                            <th>Cliente</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for v in ultimas_ventas %}
+                        <tr style="cursor:pointer;" onclick="window.location='{{ url_for('ventas.detalle', id=v.id) }}'">
+                            <td class="td-muted">#{{ v.id }}</td>
+                            <td>{{ v.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td>{{ v.cliente.nombre }}</td>
+                            <td class="fw-semibold" style="color:#2e7d32">${{ "{:,.0f}".format(v.total) }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-4">Sin ventas registradas</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                </div><!-- /table-scroll -->
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="chart-card h-100">
+            <div class="chart-card-header"><i class="bi bi-grid-3x3-gap"></i> Acceso rápido</div>
+            <div class="chart-card-body">
+                <div class="quick-links">
+                    <a href="{{ url_for('inventario.listar') }}" class="quick-link">
+                        <i class="bi bi-box-seam"></i> Inventario
+                    </a>
+                    <a href="{{ url_for('movimientos.historial') }}" class="quick-link">
+                        <i class="bi bi-arrow-left-right"></i> Movimientos
+                    </a>
+                    <a href="{{ url_for('ventas.listar') }}" class="quick-link">
+                        <i class="bi bi-cart3"></i> Ventas
+                    </a>
+                    <a href="{{ url_for('ventas.listar_clientes') }}" class="quick-link">
+                        <i class="bi bi-people"></i> Clientes
+                    </a>
+                    <a href="{{ url_for('productos.listar') }}" class="quick-link">
+                        <i class="bi bi-bag"></i> Productos
+                    </a>
+                    <a href="{{ url_for('campanas.listar') }}" class="quick-link" style="position:relative;">
+                        <i class="bi bi-calendar2-range"></i> Campañas
+                        {% if campana_activa %}
+                        <span style="position:absolute;top:8px;right:10px;width:7px;height:7px;background:#4caf50;border-radius:50%;border:1.5px solid #e8f5e9;display:inline-block;"></span>
+                        {% endif %}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// ── Animaciones de entrada del dashboard ─────────────────────────────────────
+
+/* Aplica una transición de entrada con delay. Limpia estilos inline al finalizar
+   para que efectos hover (transform) sigan funcionando normalmente */
+function entrarConTransicion(el, delay) {
+    if (!el) return;
+    el.style.opacity   = '0';
+    el.style.transform = 'translateY(14px)';
+    setTimeout(function() {
+        el.style.transition = 'opacity 0.38s ease, transform 0.38s ease';
+        el.style.opacity    = '1';
+        el.style.transform  = 'translateY(0)';
+        setTimeout(function() {
+            el.style.transition = '';
+            el.style.transform  = '';
+            el.style.opacity    = '';
+        }, 420);
+    }, delay);
+}
+
+// Header
+entrarConTransicion(document.querySelector('.dash-header'), 0);
+
+// KPI cards en cascada
+document.querySelectorAll('.kpi-card').forEach(function(card, i) {
+    entrarConTransicion(card, 60 + i * 90);
+});
+
+// Chart cards en cascada
+document.querySelectorAll('.chart-card').forEach(function(card, i) {
+    entrarConTransicion(card, 220 + i * 75);
+});
+
+// Filas de últimas ventas en cascada
+document.querySelectorAll('.dash-table tbody tr').forEach(function(row, i) {
+    entrarConTransicion(row, 360 + i * 65);
+});
+
+// Quick links en cascada
+document.querySelectorAll('.quick-link').forEach(function(link, i) {
+    entrarConTransicion(link, 260 + i * 55);
+});
+
+// ── Counter animation en valores KPI ─────────────────────────────────────────
+function contarHasta(el, delay) {
+    const texto      = el.textContent.trim();
+    const esCurrency = texto.startsWith('$');
+    const final      = parseFloat(texto.replace(/[$,.]/g, ''));
+    if (isNaN(final)) return;
+
+    /* Formatea igual que Python :,.0f — miles con coma */
+    function fmt(n) {
+        const s = Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        return esCurrency ? '$' + s : s;
+    }
+
+    el.textContent = esCurrency ? '$0' : '0';
+    setTimeout(function() {
+        const dur = 1050;
+        const t0  = performance.now();
+        (function tick(now) {
+            const p    = Math.min((now - t0) / dur, 1);
+            const ease = 1 - Math.pow(1 - p, 3); // cubic ease-out
+            el.textContent = fmt(final * ease);
+            if (p < 1) requestAnimationFrame(tick);
+        })(performance.now());
+    }, delay);
+}
+
+document.querySelectorAll('.kpi-value').forEach(function(el, i) {
+    contarHasta(el, 100 + i * 90);
+});
+
+let chartContraste;
+
+// ── Gráfica de contraste de campañas ─────────────────────────────────────────
+(function(){
+    var canvas = document.getElementById('chartContraste');
+    if (!canvas) return;
+    var d = canvas.dataset;
+    chartContraste = new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels: ['Costos', 'Ingresos ventas', 'Balance'],
+            datasets: [
+                {
+                    label: d.labelC,
+                    data: [parseFloat(d.costoC), parseFloat(d.ingresoC), parseFloat(d.balanceC)],
+                    backgroundColor: 'rgba(148,168,148,0.80)',
+                    borderColor: '#94a894',
+                    borderWidth: 1.5,
+                    borderRadius: 6,
+                    borderSkipped: false,
+                },
+                {
+                    label: d.labelA,
+                    data: [parseFloat(d.costoA), parseFloat(d.ingresoA), parseFloat(d.balanceA)],
+                    backgroundColor: d.colorA === '#94a894' ? 'rgba(148,168,148,0.80)' : 'rgba(46,125,50,0.80)',
+                    borderColor: d.borderA || '#2e7d32',
+                    borderWidth: 1.5,
+                    borderRadius: 6,
+                    borderSkipped: false,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'top', labels: { boxWidth: 12, padding: 16 } },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            return ' ' + ctx.dataset.label + ': $' + ctx.parsed.y.toLocaleString('es-CO');
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: { grid: { display: false } },
+                y: {
+                    grid: { color: '#f0f4f0' },
+                    ticks: { callback: function(v){ return '$' + (v / 1000000).toFixed(1) + 'M'; } }
+                }
+            }
+        }
+    });
+})();
+
+// ── Paleta del sistema ────────────────────────────────────────────────────────
+const C = {
+    verde:      '#2e7d32',
+    verdeClaro: '#a5d6a7',
+    verdeFondo: 'rgba(46,125,50,0.08)',
+    grises:     ['#2e7d32','#43a047','#66bb6a','#a5d6a7','#c8e6c9'],
+};
+
+Chart.defaults.font.family = "'Segoe UI', sans-serif";
+Chart.defaults.font.size   = 12;
+Chart.defaults.color       = '#6b7c6b';
+
+let chartVentas, chartProductos, chartMovimientos;
+
+// ── Renderiza las tres gráficas con los datos recibidos ──────────────────────
+function crearGraficas(datos) {
+
+    // 1. Ventas en el tiempo (línea) ──────────────────────────────────────────
+    const sinVentasEl  = document.getElementById('sinVentas');
+    const canvasVentas = document.getElementById('chartVentas');
+
+    if (datos.ventas.length === 0) {
+        sinVentasEl.style.display  = 'flex';
+        canvasVentas.style.display = 'none';
+    } else {
+        sinVentasEl.style.display  = 'none';
+        canvasVentas.style.display = 'block';
+        if (chartVentas) chartVentas.destroy();
+        chartVentas = new Chart(canvasVentas, {
+            type: 'line',
+            data: {
+                labels:   datos.ventas.map(d => formatFecha(d.fecha)),
+                datasets: [{
+                    label: 'Ventas ($)',
+                    data:  datos.ventas.map(d => d.total),
+                    borderColor:       C.verde,
+                    backgroundColor:   C.verdeFondo,
+                    borderWidth: 2.5,
+                    pointBackgroundColor: C.verde,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    tension: 0.35,
+                    fill: true,
+                }]
+            },
+            options: {
+                responsive: true,
+                aspectRatio: 3,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: ctx => ' $' + ctx.parsed.y.toLocaleString('es-CO') } }
+                },
+                scales: {
+                    x: { grid: { color: '#f0f4f0' } },
+                    y: { grid: { color: '#f0f4f0' }, ticks: { callback: v => '$' + v.toLocaleString('es-CO') } }
+                }
+            }
+        });
+    }
+
+    // 2. Top productos (barras horizontales) ──────────────────────────────────
+    const sinProdEl    = document.getElementById('sinProductos');
+    const canvasProd   = document.getElementById('chartProductos');
+
+    if (datos.top_productos.length === 0) {
+        sinProdEl.style.display  = 'flex';
+        canvasProd.style.display = 'none';
+    } else {
+        sinProdEl.style.display  = 'none';
+        canvasProd.style.display = 'block';
+        if (chartProductos) chartProductos.destroy();
+        chartProductos = new Chart(canvasProd, {
+            type: 'bar',
+            data: {
+                labels:   datos.top_productos.map(d => d.nombre),
+                datasets: [{
+                    label: 'Total vendido ($)',
+                    data:  datos.top_productos.map(d => d.total),
+                    backgroundColor: C.grises,
+                    borderRadius: 6,
+                    borderSkipped: false,
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: ctx => ' $' + ctx.parsed.x.toLocaleString('es-CO') } }
+                },
+                scales: {
+                    x: { border: { display: false }, grid: { color: '#f0f4f0' }, ticks: { callback: v => '$' + v.toLocaleString('es-CO') } },
+                    y: { border: { display: false }, grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    // 3. Movimientos entradas vs salidas (barras agrupadas) ───────────────────
+    const sinMovEl   = document.getElementById('sinMovimientos');
+    const canvasMov  = document.getElementById('chartMovimientos');
+
+    if (datos.movimientos.length === 0) {
+        sinMovEl.style.display  = 'flex';
+        canvasMov.style.display = 'none';
+    } else {
+        sinMovEl.style.display  = 'none';
+        canvasMov.style.display = 'block';
+
+        // Construir mapa fecha → totales y lookup para tooltip
+        const fechas   = [...new Set(datos.movimientos.map(d => d.fecha))].sort();
+        const mapEnt   = {}, mapSal = {}, movLookup = {};
+        datos.movimientos.forEach(d => {
+            if (d.tipo === 'entrada') mapEnt[d.fecha] = d.total;
+            else                      mapSal[d.fecha] = d.total;
+            if (!movLookup[d.fecha]) movLookup[d.fecha] = {};
+            movLookup[d.fecha][d.tipo] = d.elementos || [];
+        });
+
+        if (chartMovimientos) chartMovimientos.destroy();
+        chartMovimientos = new Chart(canvasMov, {
+            type: 'bar',
+            data: {
+                labels: fechas.map(formatFecha),
+                datasets: [
+                    { label: 'Entradas', data: fechas.map(f => mapEnt[f] || 0), backgroundColor: '#43a047', borderRadius: 4 },
+                    { label: 'Salidas',  data: fechas.map(f => mapSal[f] || 0), backgroundColor: '#e53935', borderRadius: 4 }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8 } },
+                    tooltip: {
+                        callbacks: {
+                            // Muestra el total + los elementos involucrados
+                            label: ctx => {
+                                const tipo  = ctx.datasetIndex === 0 ? 'entrada' : 'salida';
+                                const fecha = fechas[ctx.dataIndex];
+                                const elems = movLookup[fecha]?.[tipo] || [];
+                                const lineas = [`${ctx.dataset.label}: ${ctx.parsed.y}`];
+                                elems.forEach(e => lineas.push(`  · ${e}`));
+                                return lineas;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: { grid: { display: false } },
+                    y: { grid: { color: '#f0f4f0' } }
+                }
+            }
+        });
+    }
+}
+
+// ── Helpers de formato ────────────────────────────────────────────────────────
+function formatFecha(iso) {
+    const [, m, d] = iso.split('-');
+    return `${d}/${m}`;
+}
+function formatFechaLarga(iso) {
+    const [y, m, d] = iso.split('-');
+    return `${d}/${m}/${y}`;
+}
+
+// ── Petición AJAX al endpoint /dashboard/datos ────────────────────────────────
+async function cargarDatos(inicio, fin) {
+    document.getElementById('cargando').style.display = 'inline';
+    try {
+        const resp  = await fetch(`/dashboard/datos?inicio=${inicio}&fin=${fin}`);
+        const datos = await resp.json();
+        crearGraficas(datos);
+        document.getElementById('subtituloRango').textContent =
+            `${formatFechaLarga(inicio)} → ${formatFechaLarga(fin)}`;
+    } catch (e) {
+        console.error('Error al cargar datos del dashboard', e);
+    } finally {
+        document.getElementById('cargando').style.display = 'none';
+    }
+}
+
+// ── Botones de rango preestablecido ──────────────────────────────────────────
+document.querySelectorAll('.btn-rango').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.btn-rango').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const dias = parseInt(btn.dataset.dias);
+        const fin  = new Date();
+        const ini  = new Date();
+        ini.setDate(ini.getDate() - (dias - 1));
+        const finStr = fin.toISOString().slice(0, 10);
+        const iniStr = ini.toISOString().slice(0, 10);
+        document.getElementById('fechaFin').value    = finStr;
+        document.getElementById('fechaInicio').value = iniStr;
+        cargarDatos(iniStr, finStr);
+    });
+});
+
+// ── Botón Aplicar (rango personalizado) ──────────────────────────────────────
+document.getElementById('btnAplicar').addEventListener('click', () => {
+    document.querySelectorAll('.btn-rango').forEach(b => b.classList.remove('active'));
+    const inicio = document.getElementById('fechaInicio').value;
+    const fin    = document.getElementById('fechaFin').value;
+    if (inicio && fin && inicio <= fin) cargarDatos(inicio, fin);
+});
+
+// ── Carga inicial ─────────────────────────────────────────────────────────────
+cargarDatos('{{ inicio_default }}', '{{ fin_default }}');
+
+// ── Fix resize: Chart.js no crece solo cuando el contenedor se expande ────────
+window.addEventListener('resize', function() {
+    [chartContraste, chartVentas, chartProductos, chartMovimientos].forEach(function(c) {
+        if (c) c.resize();
+    });
+});
+
+// ── Suprimir eventos de hover en canvas mientras se hace scroll ───────────────
+// Evita que Chart.js redibuje las líneas al pasar el mouse sobre los gráficos
+// durante el desplazamiento de la página
+let scrollTimer = null;
+window.addEventListener('scroll', () => {
+    document.querySelectorAll('canvas').forEach(c => c.style.pointerEvents = 'none');
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => {
+        document.querySelectorAll('canvas').forEach(c => c.style.pointerEvents = 'auto');
+    }, 150);
+}, { passive: true });
+</script>
 {% endblock %}

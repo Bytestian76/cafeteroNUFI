@@ -1,55 +1,177 @@
 {% extends 'base.html' %}
+<!-- ventas/form_cliente.html — Formulario de creación/edición de cliente.
+   El campo 'origen' (oculto) indica si se llegó desde nueva factura para redirigir de vuelta.
+   Validación de teléfono (10 dígitos, empieza 3 o 6) en el servidor → _telefono_valido()
+   en venta_controller.py línea 25. También tiene validación HTML5 via pattern. -->
 {% block title %}{{ 'Editar' if cliente else 'Nuevo' }} Cliente · El Cafetero de Nufi{% endblock %}
+
+{% block styles %}
+<style>
+    /* ── Layout ── */
+    .dash-title { font-size: 1.5rem; font-weight: 700; color: #1a2e1a; margin: 0; }
+
+    /* ── Card de formulario ── */
+    .form-card {
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        border: 1px solid #e8f0e8;
+        overflow: hidden;
+    }
+    .form-card-header {
+        padding: 14px 24px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: #1a2e1a;
+        border-bottom: 1px solid #f0f4f0;
+        background: #fafcfa;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .form-card-header i { color: #2e7d32; }
+    .form-card-body { padding: 24px; }
+
+    /* ── Inputs ── */
+    .dash-label { font-size: 0.85rem; font-weight: 600; color: #3a4f3a; margin-bottom: 6px; display: block; }
+    .dash-label .opcional { font-weight: 400; color: #94a894; font-size: 0.8rem; }
+    .dash-input {
+        width: 100%;
+        border: 1.5px solid #d4e0d4;
+        border-radius: 9px;
+        padding: 9px 12px;
+        font-size: 0.88rem;
+        color: #1b2e1b;
+        background: #fff;
+        outline: none;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        box-sizing: border-box;
+    }
+    .dash-input:focus { border-color: #2e7d32; box-shadow: 0 0 0 3px rgba(46,125,50,0.10); }
+    .dash-input::placeholder { color: #b0c4b0; }
+
+    /* ── Botones ── */
+    .btn-guardar {
+        padding: 11px 24px;
+        border-radius: 10px;
+        border: none;
+        background: linear-gradient(135deg, #2e7d32, #388e3c);
+        color: #fff;
+        font-size: 0.95rem;
+        font-weight: 700;
+        cursor: pointer;
+        width: 100%;
+        display: flex; align-items: center; justify-content: center; gap: 8px;
+        box-shadow: 0 4px 14px rgba(46,125,50,0.30);
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .btn-guardar:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(46,125,50,0.40); }
+    .btn-back {
+        width: 34px; height: 34px;
+        border-radius: 9px;
+        border: 1.5px solid #d4e0d4;
+        background: #fff;
+        color: #6b7c6b;
+        cursor: pointer;
+        display: inline-flex; align-items: center; justify-content: center;
+        text-decoration: none;
+        transition: all 0.15s;
+    }
+    .btn-back:hover { background: #f0f4f0; border-color: #a5d6a7; color: #2e7d32; }
+
+    /* ── Animaciones de entrada ── */
+    .page-header-cli { animation: cliCardIn 0.30s ease both; }
+    .form-card        { animation: cliCardIn 0.38s ease 0.07s both; }
+    @keyframes cliCardIn {
+        from { opacity: 0; transform: translateY(14px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Shimmer en botón guardar ── */
+    .btn-guardar { position: relative; overflow: hidden; }
+    .btn-guardar::before {
+        content: '';
+        position: absolute; top: 0; left: -100%;
+        width: 55%; height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.20), transparent);
+        transform: skewX(-18deg);
+        animation: cliShim 3s ease-in-out infinite;
+    }
+    @keyframes cliShim { 0% { left: -100%; } 55%, 100% { left: 160%; } }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb-nav">
+    {% if origen == 'nueva' %}
+    <a href="{{ url_for('ventas.listar') }}">Ventas</a>
+    <span class="bc-sep">›</span>
+    <a href="{{ url_for('ventas.nueva') }}">Nueva factura</a>
+    {% else %}
+    <a href="{{ url_for('ventas.listar_clientes') }}">Clientes</a>
+    {% endif %}
+    <span class="bc-sep">›</span>
+    <span class="bc-current">{{ 'Editar: ' + cliente.nombre if cliente else 'Nuevo cliente' }}</span>
+</nav>
+{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-md-6">
+    <div class="col-xl-5 col-lg-7 col-md-9">
 
-        <div class="d-flex align-items-center mb-4">
-            <a href="{{ url_for('ventas.listar_clientes') }}" class="btn btn-outline-secondary btn-sm me-3">
+        <!-- Encabezado -->
+        <div class="page-header-cli d-flex align-items-center gap-3 mb-4">
+            <!-- Volver a nueva factura si se llegó desde allí, si no al listado -->
+            <a href="{{ url_for('ventas.nueva') if origen == 'nueva' else url_for('ventas.listar_clientes') }}"
+               class="btn-back">
                 <i class="bi bi-arrow-left"></i>
             </a>
-            <h3 class="fw-bold mb-0">
-                {{ 'Editar Cliente' if cliente else 'Nuevo Cliente' }}
-            </h3>
+            <div>
+                <h4 class="dash-title">
+                    <i class="bi bi-person{{ '-gear' if cliente else '-plus' }} me-2" style="color:#2e7d32"></i>
+                    {{ 'Editar Cliente' if cliente else 'Nuevo Cliente' }}
+                </h4>
+                <span style="font-size:0.82rem;color:#6b7c6b;">
+                    {{ 'Modifica los datos del cliente' if cliente else 'Completa los datos para registrar un cliente' }}
+                </span>
+            </div>
         </div>
 
-        <div class="card border-0 shadow-sm">
-            <div class="card-body p-4">
+        <div class="form-card">
+            <div class="form-card-header">
+                <i class="bi bi-person-lines-fill"></i>
+                Información del cliente
+            </div>
+            <div class="form-card-body">
                 <form method="POST">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="origen" value="{{ origen }}">
+
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Nombre / Razón social</label>
-                        <input type="text" name="nombre" class="form-control"
-                            value="{{ cliente.nombre if cliente else '' }}" required>
+                        <label class="dash-label">Nombre / Razón social <span style="color:#c62828;">*</span></label>
+                        <input type="text" name="nombre" class="dash-input" value="{{ cliente.nombre if cliente else '' }}" placeholder="Ej. Juan Pérez o Empresa S.A." required autofocus>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Documento <span class="text-muted fw-normal">(Cédula o
-                                NIT)</span></label>
-                        <input type="text" name="documento" class="form-control"
-                            value="{{ cliente.documento if cliente else '' }}">
+                        <label class="dash-label">Documento <span class="opcional">(Cédula o NIT)</span></label>
+                        <input type="text" name="documento" class="dash-input" value="{{ cliente.documento if cliente else '' }}" placeholder="Ej. 1234567890">
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Teléfono</label>
-                        <input type="text" name="telefono" class="form-control"
-                            value="{{ cliente.telefono if cliente else '' }}">
+                        <label class="dash-label">Teléfono <span style="color:#c62828;">*</span></label>
+                        <input type="text" name="telefono" id="telefono" class="dash-input" value="{{ cliente.telefono if cliente else '' }}" placeholder="Ej. 3101234567 o 6011234567" maxlength="10" inputmode="numeric" pattern="[36]\d{9}" title="10 dígitos, debe empezar por 3 (celular) o 6 (fijo)" required>
+                        <span id="tel-hint" style="font-size:0.78rem;color:#94a894;margin-top:4px;display:block;">
+                            10 dígitos · empieza por 3 (celular) o 6 (fijo)
+                        </span>
                     </div>
 
                     <div class="mb-4">
-                        <label class="form-label fw-semibold">Dirección</label>
-                        <input type="text" name="direccion" class="form-control"
-                            value="{{ cliente.direccion if cliente else '' }}">
+                        <label class="dash-label">Dirección <span class="opcional">(opcional)</span></label>
+                        <input type="text" name="direccion" class="dash-input" value="{{ cliente.direccion if cliente else '' }}" placeholder="Ej. Calle 10 #5-30, Nuquí">
                     </div>
 
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-warning">
-                            <i class="bi bi-check-lg"></i>
-                            {{ 'Guardar cambios' if cliente else 'Registrar cliente' }}
-                        </button>
-                    </div>
-
+                    <button type="submit" class="btn-guardar">
+                        <i class="bi bi-check-lg"></i>
+                        {{ 'Guardar cambios' if cliente else 'Registrar cliente' }}
+                    </button>
                 </form>
             </div>
         </div>

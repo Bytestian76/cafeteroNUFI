@@ -1,67 +1,307 @@
 {% extends 'base.html' %}
+<!-- productos/form.html — Formulario de creación/edición de producto.
+   Campos: nombre, precio unitario (con prefijo $), stock actual, unidad de medida
+   (select + campo libre si elige 'otro'), descripción opcional.
+   JS: verificarOtro() muestra/oculta el campo de unidad personalizada con slide.
+   Si 'form_data' viene → repobla el form tras error. Lógica en producto_controller.py. -->
 {% block title %}{{ 'Editar' if producto else 'Nuevo' }} Producto · El Cafetero de Nufi{% endblock %}
+
+{% block styles %}
+<style>
+    /* ── Layout ── */
+    .page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+    .page-title  { font-size: 1.4rem; font-weight: 700; color: #1a2e1a; margin: 0; }
+    .btn-back {
+        width: 36px; height: 36px;
+        border-radius: 10px;
+        border: 1.5px solid #d4e0d4;
+        background: #fff;
+        color: #2e7d32;
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: 1rem;
+        text-decoration: none;
+        transition: all 0.15s;
+        flex-shrink: 0;
+    }
+    .btn-back:hover { background: #e8f5e9; border-color: #a5d6a7; color: #1b5e20; }
+
+    /* ── Card ── */
+    .form-card {
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        border: 1px solid #e8f0e8;
+        overflow: hidden;
+    }
+    .form-card-header {
+        padding: 14px 24px;
+        border-bottom: 1px solid #f0f4f0;
+        background: #fafcfa;
+        display: flex; align-items: center; gap: 8px;
+        font-size: 0.88rem; font-weight: 600; color: #1a2e1a;
+    }
+    .form-card-header i { color: #2e7d32; }
+    .form-card-body { padding: 28px 24px; }
+
+    /* ── Inputs ── */
+    .field-label {
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #3a4f3a;
+        margin-bottom: 6px;
+        display: block;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+    .dash-input {
+        width: 100%;
+        border: 1.5px solid #d4e0d4;
+        border-radius: 9px;
+        padding: 9px 12px;
+        font-size: 0.88rem;
+        color: #1b2e1b;
+        background: #fff;
+        outline: none;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        font-family: 'Segoe UI', sans-serif;
+    }
+    .dash-input:focus { border-color: #2e7d32; box-shadow: 0 0 0 3px rgba(46,125,50,0.10); }
+    .dash-input::placeholder { color: #b0c4b0; }
+
+    .dash-textarea {
+        width: 100%;
+        border: 1.5px solid #d4e0d4;
+        border-radius: 9px;
+        padding: 9px 12px;
+        font-size: 0.88rem;
+        color: #1b2e1b;
+        background: #fff;
+        outline: none;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        font-family: 'Segoe UI', sans-serif;
+        resize: vertical;
+    }
+    .dash-textarea:focus { border-color: #2e7d32; box-shadow: 0 0 0 3px rgba(46,125,50,0.10); }
+    .dash-textarea::placeholder { color: #b0c4b0; }
+
+    .dash-select {
+        width: 100%;
+        border: 1.5px solid #d4e0d4;
+        border-radius: 9px;
+        padding: 9px 12px;
+        font-size: 0.88rem;
+        color: #1b2e1b;
+        background: #fff;
+        outline: none;
+        cursor: pointer;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        font-family: 'Segoe UI', sans-serif;
+    }
+    .dash-select:focus { border-color: #2e7d32; box-shadow: 0 0 0 3px rgba(46,125,50,0.10); }
+
+    /* ── Input group con prefijo ── */
+    .input-prefix-group { display: flex; }
+    .input-prefix {
+        display: flex; align-items: center;
+        padding: 9px 12px;
+        background: #f4f8f4;
+        border: 1.5px solid #d4e0d4;
+        border-right: none;
+        border-radius: 9px 0 0 9px;
+        font-size: 0.88rem;
+        color: #6b7c6b;
+        font-weight: 600;
+    }
+    .input-prefix + .dash-input {
+        border-radius: 0 9px 9px 0;
+    }
+
+    /* ── Separador ── */
+    .field-divider { border: none; border-top: 1px solid #f0f4f0; margin: 22px 0; }
+
+    /* ── Botón submit ── */
+    .btn-submit {
+        width: 100%;
+        padding: 11px;
+        border-radius: 10px;
+        border: none;
+        background: linear-gradient(135deg, #2e7d32, #388e3c);
+        color: #fff;
+        font-size: 0.92rem;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex; align-items: center; justify-content: center; gap: 8px;
+        box-shadow: 0 2px 8px rgba(46,125,50,0.25);
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .btn-submit:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(46,125,50,0.35); }
+
+    /* ── Hint de error ── */
+    .field-hint { font-size: 0.78rem; color: #c62828; margin-top: 4px; display: none; }
+    .field-hint.visible { display: block; }
+
+    /* ── Animaciones de entrada ── */
+    .page-header { animation: prodCardIn 0.30s ease both; }
+    .form-card   { animation: prodCardIn 0.38s ease 0.07s both; }
+    @keyframes prodCardIn {
+        from { opacity: 0; transform: translateY(14px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Unidad personalizada — slide suave ── */
+    #unidadPersonalizada {
+        max-height: 0; opacity: 0; overflow: hidden; margin-top: 0;
+        transition: max-height 0.28s ease, opacity 0.22s ease, margin-top 0.22s ease;
+        display: block !important;
+    }
+    #unidadPersonalizada.visible-smooth {
+        max-height: 60px; opacity: 1; margin-top: 8px;
+    }
+
+    /* ── Shimmer en botón submit ── */
+    .btn-submit { position: relative; overflow: hidden; }
+    .btn-submit::before {
+        content: '';
+        position: absolute; top: 0; left: -100%;
+        width: 55%; height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.20), transparent);
+        transform: skewX(-18deg);
+        animation: prodShim 3s ease-in-out infinite;
+    }
+    @keyframes prodShim { 0% { left: -100%; } 55%, 100% { left: 160%; } }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb-nav">
+    <a href="{{ url_for('productos.listar') }}">Productos</a>
+    <span class="bc-sep">›</span>
+    <span class="bc-current">{{ 'Editar: ' + producto.nombre if producto else 'Nuevo producto' }}</span>
+</nav>
+{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-md-6">
+    <div class="col-md-7 col-lg-6">
 
-        <div class="d-flex align-items-center mb-4">
-            <a href="{{ url_for('productos.listar') }}" class="btn btn-outline-secondary btn-sm me-3">
+        <!-- Header -->
+        <div class="page-header">
+            <a href="{{ url_for('productos.listar') }}" class="btn-back">
                 <i class="bi bi-arrow-left"></i>
             </a>
-            <h3 class="fw-bold mb-0">
-                {{ 'Editar Producto' if producto else 'Nuevo Producto' }}
-            </h3>
+            <div>
+                <h4 class="page-title">
+                    {% if producto %}
+                        <i class="bi bi-pencil-square me-2" style="color:#2e7d32;"></i>Editar Producto
+                    {% else %}
+                        <i class="bi bi-plus-circle me-2" style="color:#2e7d32;"></i>Nuevo Producto
+                    {% endif %}
+                </h4>
+            </div>
         </div>
 
-        <div class="card border-0 shadow-sm">
-            <div class="card-body p-4">
-                <form method="POST">
+        <!-- Formulario -->
+        <div class="form-card">
+            <div class="form-card-header">
+                <i class="bi bi-bag"></i>
+                {{ 'Editando: ' + producto.nombre if producto else 'Registrar nuevo producto' }}
+            </div>
+            <div class="form-card-body">
+                {# fd: datos del POST si falló validación, para repoblar el form #}
+                {% set fd = form_data %}
+                {% set u_sel = fd.get('unidad_medida', '') if fd else (producto.unidad_medida if producto else '') %}
+                {% set unidades_lista = ['Bolsa 125g','Bolsa 250g','Bolsa 500g','Bolsa 1kg','Bolsa 2kg','Frasco 250mL','Frasco 500mL','kg','g','arroba','L','Unidad','Bulto','Saco','Caja','Paquete','Atado'] %}
+
+                <form method="POST" id="formProducto">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Nombre</label>
-                        <input type="text" name="nombre" class="form-control"
-                            value="{{ producto.nombre if producto else '' }}" required>
+                    <!-- Nombre -->
+                    <div class="mb-4">
+                        <label class="field-label">Nombre del producto</label>
+                        <input type="text" name="nombre" id="inputNombre" class="dash-input" placeholder="Ej: Café Tostado, Panela, Aromáticas…" value="{{ fd.get('nombre', '') if fd else (producto.nombre if producto else '') }}" maxlength="100" required>
+                        <div class="field-hint" id="nombreError"></div>
+                        <p style="font-size:0.78rem;color:#94a894;margin-top:4px;">Solo el nombre, sin tamaño ni presentación. El tamaño va en <strong>Presentación</strong>.</p>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Descripción</label>
-                        <textarea name="descripcion" class="form-control" rows="3"
-                                placeholder="Descripción del producto (opcional)">{{ producto.descripcion if producto else '' }}</textarea>
-                    </div>
+                    <hr class="field-divider">
 
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label fw-semibold">Precio Unitario</label>
-                            <div class="input-group">
-                                <span class="input-group-text">$</span>
-                                <input type="number" name="precio_unitario" class="form-control"
-                                    step="0.01" min="0"
-                                    value="{{ producto.precio_unitario if producto else '' }}" required>
+                    <!-- Precio y Stock -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-6">
+                            <label class="field-label">Precio unitario</label>
+                            <div class="input-prefix-group">
+                                <span class="input-prefix">$</span>
+                                <input type="number" name="precio_unitario" class="dash-input" step="0.01" min="0" placeholder="0.00" value="{{ fd.get('precio_unitario', '') if fd else (producto.precio_unitario if producto else '') }}" required>
                             </div>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label fw-semibold">Stock Actual</label>
-                            <input type="number" name="stock_actual" class="form-control"
-                                step="0.01" min="0"
-                                value="{{ producto.stock_actual if producto else '0' }}" required>
+                        <div class="col-6">
+                            <label class="field-label">Stock actual</label>
+                            <input type="number" name="stock_actual" class="dash-input stock-input" step="0.01" min="0" placeholder="0" value="{{ fd.get('stock_actual', '0') if fd else (producto.stock_actual if producto else '0') }}" required>
                         </div>
                     </div>
 
-                    <div class="mb-4">
-                        <label class="form-label fw-semibold">Unidad de Medida</label>
-                        <input type="text" name="unidad_medida" class="form-control"
-                            placeholder="kg, bulto, arroba, unidades..."
-                            value="{{ producto.unidad_medida if producto else '' }}" required>
+                    <!-- Presentación -->
+                    <div class="mb-5">
+                        <label class="field-label">Presentación</label>
+                        <select name="unidad_medida" class="dash-select" id="selectUnidad" required onchange="verificarOtro(this)">
+                            <option value="">Seleccionar…</option>
+                            <optgroup label="Empaque con peso">
+                                <option value="Bolsa 125g"  {{ 'selected' if u_sel=='Bolsa 125g' }}>Bolsa 125g</option>
+                                <option value="Bolsa 250g"  {{ 'selected' if u_sel=='Bolsa 250g' }}>Bolsa 250g</option>
+                                <option value="Bolsa 500g"  {{ 'selected' if u_sel=='Bolsa 500g' }}>Bolsa 500g</option>
+                                <option value="Bolsa 1kg"   {{ 'selected' if u_sel=='Bolsa 1kg' }}>Bolsa 1kg</option>
+                                <option value="Bolsa 2kg"   {{ 'selected' if u_sel=='Bolsa 2kg' }}>Bolsa 2kg</option>
+                                <option value="Frasco 250mL" {{ 'selected' if u_sel=='Frasco 250mL' }}>Frasco 250mL</option>
+                                <option value="Frasco 500mL" {{ 'selected' if u_sel=='Frasco 500mL' }}>Frasco 500mL</option>
+                            </optgroup>
+                            <optgroup label="Granel / Volumen">
+                                <option value="kg"     {{ 'selected' if u_sel=='kg' }}>Por kilogramo (kg)</option>
+                                <option value="g"      {{ 'selected' if u_sel=='g' }}>Por gramo (g)</option>
+                                <option value="arroba" {{ 'selected' if u_sel=='arroba' }}>Por arroba</option>
+                                <option value="L"      {{ 'selected' if u_sel=='L' }}>Por litro (L)</option>
+                            </optgroup>
+                            <optgroup label="Empaque sin peso">
+                                <option value="Unidad"  {{ 'selected' if u_sel=='Unidad' }}>Unidad</option>
+                                <option value="Bulto"   {{ 'selected' if u_sel=='Bulto' }}>Bulto</option>
+                                <option value="Saco"    {{ 'selected' if u_sel=='Saco' }}>Saco</option>
+                                <option value="Caja"    {{ 'selected' if u_sel=='Caja' }}>Caja</option>
+                                <option value="Paquete" {{ 'selected' if u_sel=='Paquete' }}>Paquete</option>
+                                <option value="Atado"   {{ 'selected' if u_sel=='Atado' }}>Atado</option>
+                            </optgroup>
+                            <option value="otro" {{ 'selected' if u_sel == 'otro' or (u_sel and u_sel not in unidades_lista) }}>
+                                Otra…
+                            </option>
+                        </select>
+
+                        <!-- Campo personalizado — visibilidad controlada por CSS .visible-smooth -->
+                        <input type="text" id="unidadPersonalizada" name="unidad_personalizada" class="dash-input" placeholder="Ej: Bolsa 750g, Costal 25kg, Tarro 200g…" value="{{ fd.get('unidad_personalizada', '') if fd else (producto.unidad_medida if producto and producto.unidad_medida not in unidades_lista else '') }}" list="sugerenciasUnidad" autocomplete="off">
+                        <datalist id="sugerenciasUnidad">
+                            <option value="Bolsa 750g">
+                            <option value="Bolsa 3kg">
+                            <option value="Bolsa 5kg">
+                            <option value="Costal 25kg">
+                            <option value="Costal 50kg">
+                            <option value="Tarro 200g">
+                            <option value="Tarro 500g">
+                            <option value="Quintal">
+                            <option value="Fanega">
+                            <option value="Canasta">
+                        </datalist>
+                        <p style="font-size:0.78rem;color:#94a894;margin-top:4px;">Cómo se vende o empaca el producto. Ej: «Bolsa 250g» o «Por kg».</p>
+                        <div class="field-hint" id="unidadError"></div>
                     </div>
 
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-success">
-                            <i class="bi bi-check-lg"></i>
-                            {{ 'Guardar cambios' if producto else 'Registrar producto' }}
-                        </button>
+                    <!-- Descripción -->
+                    <div class="mb-4">
+                        <label class="field-label">Descripción <span style="font-weight:400;color:#94a894;">(opcional)</span></label>
+                        <textarea name="descripcion" class="dash-textarea" rows="2" placeholder="Descripción breve del producto…">{{ fd.get('descripcion', '') if fd else (producto.descripcion if producto else '') }}</textarea>
                     </div>
+
+                    <!-- Submit -->
+                    <button type="submit" class="btn-submit">
+                        <i class="bi bi-check-lg"></i>
+                        {{ 'Guardar cambios' if producto else 'Registrar producto' }}
+                    </button>
 
                 </form>
             </div>
@@ -69,4 +309,65 @@
 
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* Muestra/oculta campo personalizado con transición suave */
+function verificarOtro(sel) {
+    const campo = document.getElementById('unidadPersonalizada');
+    if (sel.value === 'otro') {
+        campo.getBoundingClientRect(); // fuerza reflow para que la transición arranque
+        campo.classList.add('visible-smooth');
+        campo.required = true;
+    } else {
+        campo.classList.remove('visible-smooth');
+        campo.required = false;
+        campo.value = '';
+        document.getElementById('unidadError').textContent = '';
+    }
+}
+
+// Limpiar 0 al enfocar el campo de stock
+document.querySelector('.stock-input').addEventListener('focus', function() {
+    if (this.value === '0' || this.value === '0.00') this.value = '';
+});
+document.querySelector('.stock-input').addEventListener('blur', function() {
+    if (this.value === '') this.value = '0';
+});
+
+// Validación nombre
+document.getElementById('inputNombre').addEventListener('input', function() {
+    const err = document.getElementById('nombreError');
+    const tieneLetra = /[A-Za-záéíóúÁÉÍÓÚñÑ]/.test(this.value);
+    if (this.value && !tieneLetra) {
+        err.textContent = 'El nombre debe contener al menos una letra.';
+        err.classList.add('visible');
+    } else {
+        err.textContent = '';
+        err.classList.remove('visible');
+    }
+});
+
+// Validación unidad personalizada
+document.getElementById('unidadPersonalizada').addEventListener('input', function() {
+    const err = document.getElementById('unidadError');
+    const tieneLetra = /[A-Za-záéíóúÁÉÍÓÚñÑ]/.test(this.value);
+    if (this.value && !tieneLetra) {
+        err.textContent = 'La unidad debe contener al menos una letra.';
+        err.classList.add('visible');
+    } else {
+        err.textContent = '';
+        err.classList.remove('visible');
+    }
+});
+
+// Inicializar campo personalizado si la unidad actual no está en el select
+const selUnidad = document.getElementById('selectUnidad');
+if (selUnidad.value === 'otro') {
+    const campo = document.getElementById('unidadPersonalizada');
+    campo.classList.add('visible-smooth'); // sin animación al cargar
+    campo.required = true;
+}
+</script>
 {% endblock %}

@@ -1,0 +1,271 @@
+{% extends 'base.html' %}
+<!-- campanas/lista.html — Listado de campañas productivas con balance por cada una.
+   Si hay campaña activa, se muestra un banner en la parte superior con opción de cerrar.
+   El controlador es campana_controller.py. -->
+{% block title %}Temporadas · El Cafetero de Nufi{% endblock %}
+
+{% block styles %}
+<style>
+    /* ── Header ── */
+    .dash-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+    .dash-title  { font-size: 1.4rem; font-weight: 700; color: #1a2e1a; margin: 0; }
+
+    /* ── Banner campaña activa ── */
+    .banner-activa {
+        background: linear-gradient(135deg, #e8f5e9, #f1f8e9);
+        border: 1.5px solid #a5d6a7;
+        border-radius: 14px;
+        padding: 16px 20px;
+        margin-bottom: 24px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+    }
+    .banner-activa-icon { font-size: 1.6rem; color: #2e7d32; flex-shrink: 0; }
+    .banner-activa-info { flex: 1; }
+    .banner-activa-nombre { font-weight: 700; color: #1b5e20; font-size: 1rem; }
+    .banner-activa-sub { font-size: 0.82rem; color: #4a7c4a; margin-top: 2px; }
+
+    /* ── Tabla ── */
+    .campana-card {
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        border: 1px solid #e8f0e8;
+        overflow: hidden;
+    }
+    .campana-card-header {
+        padding: 14px 20px;
+        border-bottom: 1px solid #f0f4f0;
+        background: #fafcfa;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #3a4f3a;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .campana-card-header i { color: #2e7d32; }
+
+    .campana-table { width: 100%; border-collapse: collapse; }
+    .campana-table th {
+        font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.05em; color: #6b7c6b;
+        padding: 12px 16px; border-bottom: 1px solid #f0f4f0;
+        white-space: nowrap;
+    }
+    .campana-table td { padding: 13px 16px; border-bottom: 1px solid #f7faf7; vertical-align: middle; font-size: 0.88rem; }
+    .campana-table tr:last-child td { border-bottom: none; }
+    .campana-table tr:hover td { background: #fafcfa; }
+
+    /* ── Badges ── */
+    .badge-activa  { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; padding: 3px 10px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; }
+    .badge-cerrada { background: #f3f3f3; color: #6b7c6b; border: 1px solid #d4d4d4; padding: 3px 10px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; }
+
+    /* ── Balance colores ── */
+    .balance-positivo { color: #2e7d32; font-weight: 700; }
+    .balance-negativo { color: #c62828; font-weight: 700; }
+    .balance-neutro   { color: #6b7c6b; font-weight: 600; }
+
+    /* ── Botones ── */
+    .btn-nueva {
+        padding: 8px 18px; border-radius: 9px; border: none;
+        background: linear-gradient(135deg, #2e7d32, #388e3c);
+        color: #fff; font-size: 0.88rem; font-weight: 600;
+        text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+        box-shadow: 0 2px 8px rgba(46,125,50,0.25);
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .btn-nueva:hover { color: #fff; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(46,125,50,0.35); }
+    .btn-detalle {
+        padding: 5px 12px; border-radius: 7px;
+        border: 1.5px solid #d4e0d4; background: #fff;
+        color: #2e7d32; font-size: 0.8rem; font-weight: 600;
+        text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+        transition: all 0.15s;
+    }
+    .btn-detalle:hover { background: #e8f5e9; border-color: #a5d6a7; color: #1b5e20; }
+    .btn-cerrar {
+        padding: 7px 14px; border-radius: 9px;
+        border: 1.5px solid #a5d6a7; background: #fff;
+        color: #c62828; font-size: 0.85rem; font-weight: 600;
+        cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+        transition: all 0.15s;
+    }
+    .btn-cerrar:hover { background: #fdecea; border-color: #ef9a9a; }
+
+    /* ── Vacío ── */
+    .empty-state { text-align: center; padding: 48px 24px; color: #6b7c6b; }
+    .empty-state i { font-size: 2.5rem; color: #a5d6a7; display: block; margin-bottom: 12px; }
+
+    /* ── Animaciones ── */
+    .dash-header { animation: campCardIn 0.3s ease both; }
+    .banner-activa { animation: campCardIn 0.35s ease 0.05s both; }
+    .campana-card { animation: campCardIn 0.38s ease 0.08s both; }
+    @keyframes campCardIn {
+        from { opacity: 0; transform: translateY(12px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Header -->
+<div class="dash-header">
+    <div>
+        <h4 class="dash-title"><i class="bi bi-calendar2-range me-2" style="color:#2e7d32"></i>Temporadas</h4>
+        <span style="font-size:0.82rem;color:#6b7c6b;">Ciclos productivos de siembra a venta</span>
+    </div>
+    {% if not activa %}
+    <a href="{{ url_for('campanas.nueva') }}" class="btn-nueva">
+        <i class="bi bi-plus-lg"></i> Nueva temporada
+    </a>
+    {% endif %}
+</div>
+
+<!-- Banner campaña activa -->
+{% if activa %}
+<div class="banner-activa">
+    <i class="bi bi-broadcast-pin banner-activa-icon"></i>
+    <div class="banner-activa-info">
+        <div class="banner-activa-nombre">{{ activa.nombre }}</div>
+        <div class="banner-activa-sub">
+            Activa desde {{ activa.fecha_inicio.strftime('%d/%m/%Y') }} &nbsp;·&nbsp;
+            {{ activa.movimientos|length }} movimientos &nbsp;·&nbsp;
+            {{ activa.ventas|length }} ventas
+        </div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('campanas.detalle', id=activa.id) }}" class="btn-detalle">
+            <i class="bi bi-eye"></i> Ver detalle
+        </a>
+        <button type="button" class="btn-cerrar" onclick="abrirModalCerrar()">
+            <i class="bi bi-lock"></i> Cerrar campaña
+        </button>
+        <form method="POST" action="{{ url_for('campanas.cerrar', id=activa.id) }}" id="formCerrarCampana">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        </form>
+    </div>
+</div>
+{% endif %}
+
+<!-- Tabla de campañas -->
+<div class="campana-card">
+    <div class="campana-card-header">
+        <i class="bi bi-list-ul"></i> Historial de temporadas
+    </div>
+
+    {% if campanas %}
+    <div class="table-scroll">
+        <table class="campana-table">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Inicio</th>
+                    <th>Cierre</th>
+                    <th>Estado</th>
+                    <th style="text-align:right;">Costos</th>
+                    <th style="text-align:right;">Ingresos</th>
+                    <th style="text-align:right;">Balance</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in campanas %}
+                {% set ingresos = c.ingreso_ventas + c.ingreso_salidas %}
+                <tr>
+                    <td>
+                        <span style="font-weight:600;color:#1a2e1a;">{{ c.nombre }}</span>
+                        {% if c.descripcion %}
+                        <div style="font-size:0.78rem;color:#94a894;margin-top:2px;">{{ c.descripcion[:60] }}{% if c.descripcion|length > 60 %}…{% endif %}</div>
+                        {% endif %}
+                    </td>
+                    <td>{{ c.fecha_inicio.strftime('%d/%m/%Y') }}</td>
+                    <td>{{ c.fecha_fin.strftime('%d/%m/%Y') if c.fecha_fin else '—' }}</td>
+                    <td>
+                        {% if c.estado == 'activa' %}
+                        <span class="badge-activa"><i class="bi bi-circle-fill" style="font-size:0.5rem;vertical-align:middle;"></i> Activa</span>
+                        {% else %}
+                        <span class="badge-cerrada">Cerrada</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align:right;color:#c62828;">${{ '{:,.2f}'.format(c.costo_total) }}</td>
+                    <td style="text-align:right;color:#2e7d32;">${{ '{:,.2f}'.format(ingresos) }}</td>
+                    <td style="text-align:right;">
+                        {% if c.balance > 0 %}
+                        <span class="balance-positivo">+${{ '{:,.2f}'.format(c.balance) }}</span>
+                        {% elif c.balance < 0 %}
+                        <span class="balance-negativo">-${{ '{:,.2f}'.format(c.balance|abs) }}</span>
+                        {% else %}
+                        <span class="balance-neutro">$0.00</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{{ url_for('campanas.detalle', id=c.id) }}" class="btn-detalle">
+                            <i class="bi bi-eye"></i> Ver
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="bi bi-calendar2-x"></i>
+        <p style="margin:0;font-weight:600;">No hay temporadas registradas</p>
+        <p style="font-size:0.82rem;margin-top:4px;">Crea la primera temporada para empezar a registrar el ciclo productivo.</p>
+        <a href="{{ url_for('campanas.nueva') }}" class="btn-nueva mt-3" style="display:inline-flex;">
+            <i class="bi bi-plus-lg"></i> Nueva temporada
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}
+
+{% block modals %}
+{% if activa %}
+<div class="modal fade" id="modalCerrarCampana" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:420px;">
+        <div class="modal-content border-0" style="border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.15);">
+            <div class="modal-header border-0 pb-0" style="padding:24px 24px 0;">
+                <div style="width:48px;height:48px;border-radius:12px;background:#fdecea;display:flex;align-items:center;justify-content:center;">
+                    <i class="bi bi-lock-fill" style="font-size:1.3rem;color:#c62828;"></i>
+                </div>
+            </div>
+            <div class="modal-body" style="padding:16px 24px 8px;">
+                <h5 style="font-weight:700;color:#1a2e1a;margin-bottom:8px;">¿Cerrar temporada?</h5>
+                <p style="font-size:0.88rem;color:#6b7c6b;margin:0;">
+                    Se registrará <strong>hoy</strong> como fecha de cierre de
+                    <strong style="color:#1a2e1a;">{{ activa.nombre }}</strong>.
+                    Esta acción no se puede deshacer.
+                </p>
+                <div style="margin-top:14px;background:#f4f8f4;border-radius:10px;padding:12px 14px;font-size:0.83rem;color:#4a7c4a;">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Los movimientos y ventas ya asociados quedarán guardados en el historial.
+                </div>
+            </div>
+            <div class="modal-footer border-0 d-flex" style="padding:16px 24px 24px;gap:10px;">
+                <button type="button" class="btn" data-bs-dismiss="modal"
+                    style="flex:1;border-radius:9px;border:1.5px solid #d4e0d4;background:#fff;color:#3a4f3a;font-weight:600;padding:9px;">
+                    Cancelar
+                </button>
+                <button type="button" onclick="document.getElementById('formCerrarCampana').submit()"
+                    style="flex:1;border-radius:9px;border:none;background:linear-gradient(135deg,#c62828,#d32f2f);color:#fff;font-weight:600;padding:9px;cursor:pointer;box-shadow:0 2px 8px rgba(198,40,40,0.30);">
+                    <i class="bi bi-lock me-1"></i> Sí, cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function abrirModalCerrar() {
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalCerrarCampana')).show();
+}
+</script>
+{% endblock %}

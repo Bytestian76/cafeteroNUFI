@@ -1,0 +1,207 @@
+{% extends 'base.html' %}
+<!-- auth/buscar.html — Resultados de la búsqueda global.
+   Recibe: q (término), resultados (dict con listas: productos, clientes, inventario), total.
+   El buscador está en el navbar de base.html; la lógica en auth_controller.py línea 170. -->
+{% block title %}Búsqueda · El Cafetero de Nufi{% endblock %}
+
+{% block styles %}
+<style>
+    .search-header { margin-bottom: 28px; animation: srchIn 0.3s ease both; }
+    .search-title  { font-size: 1.4rem; font-weight: 700; color: #1a2e1a; margin: 0; }
+
+    .result-section { animation: srchIn 0.38s ease 0.07s both; margin-bottom: 24px; }
+    @keyframes srchIn {
+        from { opacity: 0; transform: translateY(12px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .result-card {
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        border: 1px solid #e8f0e8;
+        overflow: hidden;
+    }
+    .result-card-header {
+        padding: 12px 20px;
+        border-bottom: 1px solid #f0f4f0;
+        background: #fafcfa;
+        display: flex; align-items: center; gap: 8px;
+        font-size: 0.85rem; font-weight: 600; color: #1a2e1a;
+    }
+    .result-card-header i { color: #2e7d32; }
+    .result-card-header .count {
+        margin-left: auto;
+        font-size: 0.75rem; font-weight: 500; color: #94a894;
+    }
+
+    .result-item {
+        display: flex; align-items: center; gap: 14px;
+        padding: 12px 20px;
+        border-bottom: 1px solid #f4f8f4;
+        text-decoration: none;
+        color: #2a3d2a;
+        transition: background 0.12s;
+    }
+    .result-item:last-child { border-bottom: none; }
+    .result-item:hover { background: #f8faf7; }
+    .result-item-icon {
+        width: 36px; height: 36px; border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1rem; flex-shrink: 0;
+    }
+    .icon-prod { background: #e8f5e9; color: #2e7d32; }
+    .icon-cli  { background: #e0f2f1; color: #00695c; }
+    .icon-inv  { background: #e3f2fd; color: #1565c0; }
+    .result-name  { font-weight: 600; font-size: 0.9rem; }
+    .result-sub   { font-size: 0.78rem; color: #94a894; margin-top: 2px; }
+    .result-badge {
+        margin-left: auto; font-size: 0.72rem; font-weight: 600;
+        background: #e8f5e9; color: #2e7d32;
+        border-radius: 20px; padding: 2px 10px;
+    }
+    .result-badge.alerta { background: #fdecea; color: #c62828; }
+
+    .no-results {
+        display: flex; flex-direction: column; align-items: center;
+        justify-content: center; padding: 60px 20px; gap: 12px;
+        color: #94a894;
+    }
+    .no-results i { font-size: 2.5rem; opacity: 0.4; }
+    .no-results p { font-size: 0.9rem; margin: 0; }
+
+    .empty-query {
+        display: flex; flex-direction: column; align-items: center;
+        justify-content: center; padding: 80px 20px; gap: 14px;
+        color: #94a894;
+    }
+    .empty-query i { font-size: 3rem; opacity: 0.3; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Header -->
+<div class="search-header">
+    <h4 class="search-title">
+        <i class="bi bi-search me-2" style="color:#2e7d32;"></i>
+        {% if q %}
+            Resultados para <em style="color:#2e7d32;">"{{ q }}"</em>
+        {% else %}
+            Búsqueda global
+        {% endif %}
+    </h4>
+    {% if q %}
+    <span style="font-size:0.82rem;color:#6b7c6b;">
+        {{ total }} resultado(s) encontrado(s)
+    </span>
+    {% endif %}
+</div>
+
+{% if not q %}
+<!-- Sin término de búsqueda -->
+<div class="result-card">
+    <div class="empty-query">
+        <i class="bi bi-search"></i>
+        <p>Escribe algo en la barra de búsqueda del menú para comenzar.</p>
+    </div>
+</div>
+
+{% elif total == 0 %}
+<!-- Sin resultados -->
+<div class="result-card">
+    <div class="no-results">
+        <i class="bi bi-emoji-frown"></i>
+        <p>No se encontraron resultados para <strong>"{{ q }}"</strong>.</p>
+        <p style="font-size:0.82rem;">Intenta con otro término o revisa la ortografía.</p>
+    </div>
+</div>
+
+{% else %}
+
+<div class="row g-4">
+
+    <!-- Productos -->
+    {% if resultados.productos %}
+    <div class="col-12 result-section">
+        <div class="result-card">
+            <div class="result-card-header">
+                <i class="bi bi-bag"></i> Productos
+                <span class="count">{{ resultados.productos|length }} resultado(s)</span>
+            </div>
+            {% for p in resultados.productos %}
+            <a href="{{ url_for('productos.editar', id=p.id) }}" class="result-item">
+                <div class="result-item-icon icon-prod"><i class="bi bi-bag"></i></div>
+                <div>
+                    <div class="result-name">{{ p.nombre }}</div>
+                    <div class="result-sub">
+                        ${{ "{:,.0f}".format(p.precio_unitario) }} · {{ p.unidad_medida }}
+                        · Stock: {{ p.stock_actual|int if p.stock_actual == p.stock_actual|int else p.stock_actual }}
+                    </div>
+                </div>
+                <span class="result-badge {{ 'alerta' if not p.activo }}">
+                    {{ 'Activo' if p.activo else 'Inactivo' }}
+                </span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Clientes -->
+    {% if resultados.clientes %}
+    <div class="col-12 result-section">
+        <div class="result-card">
+            <div class="result-card-header">
+                <i class="bi bi-people"></i> Clientes
+                <span class="count">{{ resultados.clientes|length }} resultado(s)</span>
+            </div>
+            {% for c in resultados.clientes %}
+            <a href="{{ url_for('ventas.editar_cliente', id=c.id) }}" class="result-item">
+                <div class="result-item-icon icon-cli"><i class="bi bi-person"></i></div>
+                <div>
+                    <div class="result-name">{{ c.nombre }}</div>
+                    <div class="result-sub">
+                        {{ c.documento or 'Sin documento' }} · {{ c.telefono or 'Sin teléfono' }}
+                    </div>
+                </div>
+                <span class="result-badge">{{ c.ventas|length }} venta(s)</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Inventario -->
+    {% if resultados.inventario %}
+    <div class="col-12 result-section">
+        <div class="result-card">
+            <div class="result-card-header">
+                <i class="bi bi-box-seam"></i> Inventario
+                <span class="count">{{ resultados.inventario|length }} resultado(s)</span>
+            </div>
+            {% for e in resultados.inventario %}
+            <a href="{{ url_for('inventario.editar', id=e.id) }}" class="result-item">
+                <div class="result-item-icon icon-inv"><i class="bi bi-box-seam"></i></div>
+                <div>
+                    <div class="result-name">{{ e.nombre }}</div>
+                    <div class="result-sub">
+                        {{ e.categoria }} · Stock: {{ e.stock_actual }} {{ e.unidad_medida }}
+                        (mín. {{ e.stock_minimo }})
+                    </div>
+                </div>
+                {% if e.tiene_alerta %}
+                <span class="result-badge alerta"><i class="bi bi-exclamation-triangle-fill me-1"></i>Escasez</span>
+                {% else %}
+                <span class="result-badge">OK</span>
+                {% endif %}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endif %}
+
+{% endblock %}

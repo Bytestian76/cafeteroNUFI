@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+<!-- trabajadores/form_jornal.html — Registrar un jornal para un trabajador en una temporada.
+     Controlador: trabajador_controller.py línea 83 -->
+{% block title %}Registrar Jornal · El Cafetero de Nufi{% endblock %}
+
+{% block styles %}
+<style>
+    .page-header { display:flex;align-items:center;gap:12px;margin-bottom:28px; }
+    .page-title  { font-size:1.4rem;font-weight:700;color:#1a2e1a;margin:0; }
+    .btn-back { width:36px;height:36px;border-radius:10px;border:1.5px solid #d4e0d4;background:#fff;color:#2e7d32;display:inline-flex;align-items:center;justify-content:center;font-size:1rem;text-decoration:none;transition:all 0.15s;flex-shrink:0; }
+    .btn-back:hover { background:#e8f5e9;border-color:#a5d6a7;color:#1b5e20; }
+
+    .form-card { background:#fff;border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,0.06);border:1px solid #e8f0e8;overflow:hidden; }
+    .form-card-header { padding:14px 24px;border-bottom:1px solid #f0f4f0;background:#fafcfa;display:flex;align-items:center;gap:8px;font-size:0.88rem;font-weight:600;color:#1a2e1a; }
+    .form-card-header i { color:#2e7d32; }
+    .form-card-body { padding:28px 24px; }
+
+    .field-label { font-size:0.82rem;font-weight:600;color:#3a4f3a;margin-bottom:6px;display:block;text-transform:uppercase;letter-spacing:0.04em; }
+    .field-hint  { font-size:0.78rem;color:#94a894;margin-top:4px; }
+    .dash-input  { width:100%;border:1.5px solid #d4e0d4;border-radius:9px;padding:9px 12px;font-size:0.88rem;color:#1b2e1b;background:#fff;outline:none;transition:border-color 0.2s,box-shadow 0.2s; }
+    .dash-input:focus { border-color:#2e7d32;box-shadow:0 0 0 3px rgba(46,125,50,0.10); }
+
+    .preview-total { background:#e8f5e9;border:1.5px solid #a5d6a7;border-radius:10px;padding:14px 18px;margin-bottom:20px;display:none; }
+    .preview-label { font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#4a7c4a;margin-bottom:4px; }
+    .preview-valor { font-size:1.5rem;font-weight:800;color:#2e7d32; }
+
+    .btn-submit { width:100%;padding:11px;border-radius:9px;border:none;background:linear-gradient(135deg,#2e7d32,#388e3c);color:#fff;font-size:0.92rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 2px 8px rgba(46,125,50,0.25);transition:transform 0.15s,box-shadow 0.15s;margin-top:8px; }
+    .btn-submit:hover { transform:translateY(-1px);box-shadow:0 4px 14px rgba(46,125,50,0.35); }
+
+    .page-header { animation:formIn 0.3s ease both; }
+    .form-card   { animation:formIn 0.38s ease 0.06s both; }
+    @keyframes formIn { from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);} }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb-nav">
+    <a href="{{ url_for('trabajadores.hub_operaciones') }}">Operaciones</a>
+    <span class="bc-sep">›</span>
+    <a href="{{ url_for('trabajadores.listar') }}">Trabajadores</a>
+    <span class="bc-sep">›</span>
+    <span class="bc-current">Registrar jornal</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+
+        <div class="page-header">
+            <a href="{{ url_for('trabajadores.listar') }}" class="btn-back"><i class="bi bi-arrow-left"></i></a>
+            <div>
+                <h4 class="page-title">Registrar jornal</h4>
+                <span style="font-size:0.82rem;color:#6b7c6b;">Pago individual a un trabajador</span>
+            </div>
+        </div>
+
+        <div class="form-card">
+            <div class="form-card-header">
+                <i class="bi bi-calendar-plus"></i> Datos del jornal
+            </div>
+            <div class="form-card-body">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <div class="mb-4">
+                        <label class="field-label">Trabajador <span style="color:#c62828;">*</span></label>
+                        <select name="trabajador_id" class="dash-input" required>
+                            <option value="">— Seleccionar —</option>
+                            {% for t in trabajadores %}
+                            <option value="{{ t.id }}">{{ t.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="field-label">Temporada <span style="color:#c62828;">*</span></label>
+                        <select name="campana_id" class="dash-input" required>
+                            <option value="">— Seleccionar —</option>
+                            {% for c in campanas %}
+                            <option value="{{ c.id }}" {{ 'selected' if c.id == campana_id_pre }}>{{ c.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                        {% if not campanas %}
+                        <p class="field-hint" style="color:#c62828;">No hay temporadas activas. Activa una antes de registrar jornales.</p>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="field-label">Fecha <span style="color:#c62828;">*</span></label>
+                        <input type="date" name="fecha" class="dash-input" value="{{ today }}" required>
+                    </div>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-6">
+                            <label class="field-label">Cant. jornales <span style="color:#c62828;">*</span></label>
+                            <input type="number" name="cantidad_jornales" id="cantidad" class="dash-input" step="0.5" min="0.5" placeholder="1" required>
+                            <p class="field-hint">0.5 = medio día</p>
+                        </div>
+                        <div class="col-6">
+                            <label class="field-label">Valor por jornal <span style="color:#c62828;">*</span></label>
+                            <input type="number" name="valor_jornal" id="valor" class="dash-input" step="1000" min="0" placeholder="50000" required>
+                        </div>
+                    </div>
+
+                    <!-- Preview del total calculado -->
+                    <div class="preview-total" id="previewTotal">
+                        <div class="preview-label"><i class="bi bi-calculator me-1"></i>Total a pagar</div>
+                        <div class="preview-valor" id="previewValor">$0</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="field-label">Observación <span style="font-weight:400;text-transform:none;color:#94a894;letter-spacing:0;">(opcional)</span></label>
+                        <textarea name="observacion" class="dash-input" rows="2" maxlength="500"></textarea>
+                    </div>
+
+                    <button type="submit" class="btn-submit">
+                        <i class="bi bi-check-lg"></i> Registrar jornal
+                    </button>
+                </form>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* Calcula y muestra el total en tiempo real */
+const cantInput  = document.getElementById('cantidad');
+const valorInput = document.getElementById('valor');
+const preview    = document.getElementById('previewTotal');
+const previewVal = document.getElementById('previewValor');
+
+function actualizarPreview() {
+    const c = parseFloat(cantInput.value)  || 0;
+    const v = parseFloat(valorInput.value) || 0;
+    const total = c * v;
+    if (c > 0 && v > 0) {
+        previewVal.textContent = '$' + total.toLocaleString('es-CO', {minimumFractionDigits: 0});
+        preview.style.display = 'block';
+    } else {
+        preview.style.display = 'none';
+    }
+}
+cantInput.addEventListener('input',  actualizarPreview);
+valorInput.addEventListener('input', actualizarPreview);
+</script>
+{% endblock %}

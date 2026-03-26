@@ -1,136 +1,531 @@
 {% extends 'base.html' %}
 {% from 'paginacion.html' import paginar %}
+<!-- movimientos/historial.html — Historial paginado de movimientos de inventario.
+   Filtros: elemento, tipo (entrada/salida), rango de fechas.
+   KPIs: total entradas y salidas sobre el conjunto filtrado (antes de paginar).
+   Lógica del servidor: historial() en movimiento_controller.py línea 29. -->
 {% block title %}Movimientos · El Cafetero de Nufi{% endblock %}
 
+{% block styles %}
+<style>
+    /* ── Layout ── */
+    .dash-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; }
+    .dash-title  { font-size: 1.5rem; font-weight: 700; color: #1a2e1a; margin: 0; }
+
+    /* ── KPI mini ── */
+    .kpi-card {
+        background: #fff;
+        border-radius: 14px;
+        padding: 16px 20px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        border: 1px solid #e8f0e8;
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.09); }
+    .kpi-icon  { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; flex-shrink: 0; }
+    .kpi-green { background: #e8f5e9; color: #2e7d32; }
+    .kpi-red   { background: #fce4ec; color: #c62828; }
+    .kpi-blue  { background: #e3f2fd; color: #1565c0; }
+    .kpi-amber { background: #fff8e1; color: #f57f17; }
+    .kpi-value { font-size: 1.4rem; font-weight: 800; color: #1a2e1a; line-height: 1; }
+    .kpi-label { font-size: 0.75rem; color: #6b7c6b; margin-top: 3px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
+
+    /* ── Filtros ── */
+    .filter-bar {
+        background: #fff;
+        border-radius: 12px;
+        border: 1px solid #e8f0e8;
+        padding: 12px 18px;
+        box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+        margin-bottom: 20px;
+    }
+    .ctrl-label { font-size: 0.82rem; font-weight: 600; color: #3a4f3a; white-space: nowrap; }
+    .dash-select {
+        border: 1.5px solid #d4e0d4;
+        border-radius: 8px;
+        padding: 5px 10px;
+        font-size: 0.85rem;
+        color: #1b2e1b;
+        background: #fff;
+        outline: none;
+        transition: border-color 0.2s;
+        cursor: pointer;
+    }
+    .dash-select:focus { border-color: #2e7d32; box-shadow: 0 0 0 3px rgba(46,125,50,0.10); }
+    .dash-input-sm {
+        border: 1.5px solid #d4e0d4;
+        border-radius: 8px;
+        padding: 5px 10px;
+        font-size: 0.85rem;
+        color: #1b2e1b;
+        background: #fff;
+        outline: none;
+        transition: border-color 0.2s;
+    }
+    .dash-input-sm:focus { border-color: #2e7d32; box-shadow: 0 0 0 3px rgba(46,125,50,0.10); }
+    .btn-filtro-buscar {
+        padding: 5px 14px;
+        border-radius: 8px;
+        border: none;
+        background: linear-gradient(135deg, #2e7d32, #388e3c);
+        color: #fff;
+        font-size: 0.82rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex; align-items: center; gap: 5px;
+        box-shadow: 0 2px 6px rgba(46,125,50,0.20);
+        transition: all 0.15s;
+    }
+    .btn-filtro-buscar:hover { box-shadow: 0 3px 10px rgba(46,125,50,0.30); transform: translateY(-1px); }
+    .btn-filtro-clear {
+        padding: 5px 12px;
+        border-radius: 8px;
+        border: 1.5px solid #d4e0d4;
+        background: #fff;
+        font-size: 0.82rem;
+        color: #6b7c6b;
+        cursor: pointer;
+        transition: all 0.15s;
+        text-decoration: none;
+        display: inline-flex; align-items: center; gap: 4px;
+    }
+    .btn-filtro-clear:hover { background: #f5f5f5; border-color: #bbb; color: #333; }
+
+    /* ── Tabla ── */
+    .chart-card {
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        border: 1px solid #e8f0e8;
+        overflow: hidden;
+    }
+    .chart-card-header {
+        padding: 14px 20px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: #1a2e1a;
+        border-bottom: 1px solid #f0f4f0;
+        display: flex; align-items: center; gap: 8px;
+        background: #fafcfa;
+    }
+    .chart-card-header i { color: #2e7d32; font-size: 1rem; }
+    .chart-card-footer { padding: 12px 20px; border-top: 1px solid #f0f4f0; background: #fafcfa; }
+
+    .dash-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; table-layout: fixed; min-width: 640px; }
+    .dash-table thead tr { border-bottom: 2px solid #e8f0e8; }
+    .dash-table th { padding: 10px 16px; font-size: 0.75rem; font-weight: 700; color: #6b7c6b; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; text-align: center; overflow: hidden; }
+    .dash-table tbody tr { border-bottom: 1px solid #f4f8f4; transition: background 0.12s; }
+    .dash-table tbody tr:last-child { border-bottom: none; }
+    .dash-table tbody tr:hover { background: #f8faf7; }
+    .dash-table td { padding: 11px 16px; color: #2a3d2a; vertical-align: middle; text-align: center; overflow: hidden; }
+
+    /* ── Anchos fijos de columnas ── */
+    .dash-table col.col-id     { width: 4%; }
+    .dash-table col.col-elem   { width: 17%; }
+    .dash-table col.col-tipo   { width: 9%; }
+    .dash-table col.col-cant   { width: 9%; }
+    .dash-table col.col-valor  { width: 11%; }
+    .dash-table col.col-obs    { width: 15%; }
+    .dash-table col.col-campana{ width: 14%; }
+    .dash-table col.col-user   { width: 11%; }
+    .dash-table col.col-fecha  { width: 10%; }
+
+    /* ── Badge campaña ── */
+    .camp-badge {
+        display: inline-flex; align-items: center; gap: 4px;
+        border-radius: 20px; padding: 3px 9px;
+        font-size: 0.73rem; font-weight: 600; white-space: nowrap;
+        max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+    }
+    .camp-activa  { background: #e8f5e9; color: #2e7d32; }
+    .camp-cerrada { background: #f3f3f3; color: #777; }
+
+    /* ── Truncado de observación ── */
+    .obs-cell {
+        display: block;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        cursor: pointer;
+        color: #3a4f3a;
+        text-decoration-line: underline;
+        text-decoration-style: dotted;
+        text-decoration-color: #a5d6a7;
+        text-underline-offset: 3px;
+    }
+
+    /* ── Popover personalizado ── */
+    #obsPopover {
+        position: fixed;
+        z-index: 9999;
+        display: none;
+        max-width: 280px;
+        background: #fff;
+        border: 1px solid #d4e0d4;
+        border-radius: 12px;
+        box-shadow: 0 8px 28px rgba(0,0,0,0.13);
+        overflow: hidden;
+        pointer-events: none;
+    }
+    #obsPopover .pop-header {
+        background: #fafcfa;
+        border-bottom: 1px solid #f0f4f0;
+        padding: 8px 14px;
+        display: flex; align-items: center; gap: 6px;
+        font-size: 0.75rem; font-weight: 700;
+        color: #3a4f3a; text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    #obsPopover .pop-header i { color: #2e7d32; }
+    #obsPopover .pop-body {
+        padding: 12px 14px;
+        font-size: 0.85rem;
+        color: #2a3d2a;
+        line-height: 1.5;
+        word-break: break-word;
+        white-space: normal;
+    }
+
+    /* ── Badges de tipo ── */
+    .tipo-badge {
+        display: inline-flex; align-items: center; gap: 5px;
+        border-radius: 20px; padding: 3px 10px;
+        font-size: 0.75rem; font-weight: 600;
+    }
+    .tipo-entrada { background: #e8f5e9; color: #2e7d32; }
+    .tipo-salida  { background: #fce4ec; color: #c62828; }
+
+    /* ── Botones principales ── */
+    .btn-primary-mov {
+        padding: 7px 16px;
+        border-radius: 9px;
+        border: none;
+        background: linear-gradient(135deg, #2e7d32, #388e3c);
+        color: #fff;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex; align-items: center; gap: 6px;
+        box-shadow: 0 2px 8px rgba(46,125,50,0.25);
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .btn-primary-mov:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(46,125,50,0.35); color: #fff; }
+    .btn-pdf {
+        padding: 7px 16px;
+        border-radius: 9px;
+        border: 1.5px solid #ffcdd2;
+        background: #fff;
+        color: #c62828;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex; align-items: center; gap: 6px;
+        transition: all 0.15s;
+    }
+    .btn-pdf:hover { background: #fdecea; border-color: #ef9a9a; color: #b71c1c; }
+
+    /* ── Sin datos ── */
+    .no-data { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 140px; color: #94a894; font-size: 0.88rem; gap: 8px; }
+    .no-data i { font-size: 2rem; opacity: 0.4; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h3 class="fw-bold"><i class="bi bi-arrow-left-right"></i> Historial de Movimientos</h3>
+
+<!-- Header -->
+<div class="dash-header">
+    <div>
+        <h4 class="dash-title"><i class="bi bi-arrow-left-right me-2" style="color:#2e7d32"></i>Movimientos</h4>
+        <span style="font-size:0.82rem;color:#6b7c6b;">Historial de entradas y salidas de inventario</span>
+    </div>
     <div class="d-flex gap-2">
-        <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#modalReporteMovimientos">
-            <i class="bi bi-file-earmark-pdf"></i> Generar Reporte PDF
+        <button class="btn-pdf" data-bs-toggle="modal" data-bs-target="#modalReporteMovimientos">
+            <i class="bi bi-file-earmark-pdf"></i> Reporte PDF
         </button>
-        <a href="{{ url_for('movimientos.nuevo') }}" class="btn btn-primary">
+        <a href="{{ url_for('movimientos.nuevo') }}" class="btn-primary-mov">
             <i class="bi bi-plus-lg"></i> Nuevo Movimiento
         </a>
     </div>
 </div>
 
-<!-- Filtros -->
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-body">
-        <form method="GET">
-            <div class="row g-2 align-items-end">
-                <div class="col-md-3">
-                    <label class="form-label fw-semibold">Elemento</label>
-                    <select name="elemento_id" class="form-select form-select-sm">
-                        <option value="">Todos</option>
-                        {% for e in elementos %}
-                        <option value="{{ e.id }}" {{ 'selected' if filtros.elemento_id == e.id|string }}>
-                            {{ e.nombre }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label fw-semibold">Tipo</label>
-                    <select name="tipo" class="form-select form-select-sm">
-                        <option value="">Todos</option>
-                        <option value="entrada" {{ 'selected' if filtros.tipo == 'entrada' }}>Entrada</option>
-                        <option value="salida"  {{ 'selected' if filtros.tipo == 'salida' }}>Salida</option>
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label fw-semibold">Desde</label>
-                    <input type="date" name="fecha_desde" class="form-control form-control-sm"
-                           max="{{ today }}"
-                           value="{{ filtros.fecha_desde }}">
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label fw-semibold">Hasta</label>
-                    <input type="date" name="fecha_hasta" class="form-control form-control-sm"
-                           max="{{ today }}"
-                           value="{{ filtros.fecha_hasta }}">
-                </div>
-                <div class="col-md-1">
-                    <button type="submit" class="btn btn-success btn-sm w-100">
-                        <i class="bi bi-search"></i>
-                    </button>
-                </div>
-                <div class="col-md-2">
-                    <a href="{{ url_for('movimientos.historial') }}" class="btn btn-outline-secondary btn-sm w-100">
-                        <i class="bi bi-x"></i> Limpiar
-                    </a>
-                </div>
+<!-- Mini KPIs -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card">
+            <div class="kpi-icon kpi-blue"><i class="bi bi-arrow-left-right"></i></div>
+            <div>
+                <div class="kpi-value">{{ paginacion.total }}</div>
+                <div class="kpi-label">Total registros</div>
             </div>
-        </form>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card">
+            <div class="kpi-icon kpi-green"><i class="bi bi-box-arrow-in-down"></i></div>
+            <div>
+                <div class="kpi-value">{{ total_entradas }}</div>
+                <div class="kpi-label">Entradas</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card">
+            <div class="kpi-icon kpi-red"><i class="bi bi-box-arrow-up"></i></div>
+            <div>
+                <div class="kpi-value">{{ total_salidas }}</div>
+                <div class="kpi-label">Salidas</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card">
+            <div class="kpi-icon kpi-amber"><i class="bi bi-funnel"></i></div>
+            <div>
+                <div class="kpi-value" style="font-size:1rem;">
+                    {% if filtros.tipo == 'entrada' %}Entradas
+                    {% elif filtros.tipo == 'salida' %}Salidas
+                    {% else %}Todos{% endif %}
+                </div>
+                <div class="kpi-label">Tipo activo</div>
+            </div>
+        </div>
     </div>
 </div>
 
-<!-- Tabla -->
-<div class="card border-0 shadow-sm">
-    <div class="card-body p-0">
-        <table class="table table-hover mb-0">
-            <thead class="table-primary">
-                <tr>
-                    <th>#</th>
-                    <th>Elemento</th>
-                    <th>Tipo</th>
-                    <th>Cantidad</th>
-                    <th>Observación</th>
-                    <th>Usuario</th>
-                    <th>Fecha</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for m in movimientos %}
-                <tr>
-                    <td>{{ m.id }}</td>
-                    <td>{{ m.elemento.nombre }}</td>
-                    <td>
-                        {% if m.tipo == 'entrada' %}
-                            <span class="badge bg-success">📥 Entrada</span>
-                        {% else %}
-                            <span class="badge bg-danger">📤 Salida</span>
-                        {% endif %}
-                    </td>
-                    <td>{{ m.cantidad }} {{ m.elemento.unidad_medida }}</td>
-                    <td>{{ m.observacion or '—' }}</td>
-                    <td>{{ m.usuario.nombre }}</td>
-                    <td>{{ m.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="7" class="text-center text-muted py-4">
-                        No hay movimientos registrados.
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+<!-- KPIs financieros -->
+<div class="row g-3 mb-4">
+    <div class="col-6">
+        <div class="kpi-card">
+            <div class="kpi-icon kpi-green"><i class="bi bi-cash-coin"></i></div>
+            <div>
+                <div class="kpi-value" style="font-size:1.1rem;">$ {{ '{:,.0f}'.format(total_valor_entradas).replace(',', '.') }}</div>
+                <div class="kpi-label">Total gastado en compras</div>
+            </div>
+        </div>
     </div>
-    <div class="card-footer bg-white border-0 py-3">
+    <div class="col-6">
+        <div class="kpi-card">
+            <div class="kpi-icon kpi-red"><i class="bi bi-cash-stack"></i></div>
+            <div>
+                <div class="kpi-value" style="font-size:1.1rem;">$ {{ '{:,.0f}'.format(total_valor_salidas).replace(',', '.') }}</div>
+                <div class="kpi-label">Total recibido en ventas</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros -->
+<form method="GET" id="formFiltros">
+    <div class="filter-bar">
+        <div class="d-flex align-items-center gap-3 flex-wrap">
+            <span class="ctrl-label"><i class="bi bi-funnel me-1"></i>Filtros</span>
+
+            <div class="d-flex align-items-center gap-2">
+                <span class="ctrl-label" style="font-weight:500;">Elemento:</span>
+                <select name="elemento_id" class="dash-select">
+                    <option value="">Todos</option>
+                    {% for e in elementos %}
+                    <option value="{{ e.id }}" {{ 'selected' if filtros.elemento_id == e.id|string }}>
+                        {{ e.nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <span class="ctrl-label" style="font-weight:500;">Tipo:</span>
+                <select name="tipo" class="dash-select">
+                    <option value="">Todos</option>
+                    <option value="entrada" {{ 'selected' if filtros.tipo == 'entrada' }}>Entrada</option>
+                    <option value="salida"  {{ 'selected' if filtros.tipo == 'salida' }}>Salida</option>
+                </select>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <span class="ctrl-label" style="font-weight:500;">Desde:</span>
+                <input type="date" name="fecha_desde" class="dash-input-sm" max="{{ today }}" value="{{ filtros.fecha_desde }}">
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <span class="ctrl-label" style="font-weight:500;">Hasta:</span>
+                <input type="date" name="fecha_hasta" class="dash-input-sm" max="{{ today }}" value="{{ filtros.fecha_hasta }}">
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <span class="ctrl-label" style="font-weight:500;">Campaña:</span>
+                <select name="campana_id" class="dash-select">
+                    <option value="">Todas</option>
+                    {% for c in campanas %}
+                    <option value="{{ c.id }}" {{ 'selected' if filtros.campana_id == c.id|string }}>
+                        {{ c.nombre }}{% if c.estado == 'activa' %} ●{% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <button type="submit" class="btn-filtro-buscar">
+                <i class="bi bi-search"></i> Buscar
+            </button>
+
+            {% if filtros.elemento_id or filtros.tipo or filtros.fecha_desde or filtros.fecha_hasta or filtros.campana_id %}
+            <a href="{{ url_for('movimientos.historial') }}" class="btn-filtro-clear">
+                <i class="bi bi-x-circle"></i> Limpiar
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</form>
+
+<!-- Tabla -->
+<div class="chart-card">
+    <div class="chart-card-header">
+        <i class="bi bi-table"></i>
+        Historial
+        <span style="font-weight:400;color:#94a894;font-size:0.78rem;margin-left:auto;">
+            {{ paginacion.total }} registro(s)
+        </span>
+    </div>
+
+    <div class="table-scroll">
+    <table class="dash-table">
+        <colgroup>
+            <col class="col-id">
+            <col class="col-elem">
+            <col class="col-tipo">
+            <col class="col-cant">
+            <col class="col-valor">
+            <col class="col-obs">
+            <col class="col-campana">
+            <col class="col-user">
+            <col class="col-fecha">
+        </colgroup>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Elemento</th>
+                <th>Tipo</th>
+                <th>Cantidad</th>
+                <th>Valor ($)</th>
+                <th>Observación</th>
+                <th>Campaña</th>
+                <th>Usuario</th>
+                <th>Fecha</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for m in movimientos %}
+            <tr>
+                <td class="td-muted">#{{ m.id }}</td>
+                <td style="font-weight:600;">{{ m.elemento.nombre }}</td>
+                <td>
+                    {% if m.tipo == 'entrada' %}
+                        <span class="tipo-badge tipo-entrada">
+                            <i class="bi bi-box-arrow-in-down"></i> Entrada
+                        </span>
+                    {% else %}
+                        <span class="tipo-badge tipo-salida">
+                            <i class="bi bi-box-arrow-up"></i> Salida
+                        </span>
+                    {% endif %}
+                </td>
+                <td style="font-weight:600;">
+                    {{ m.cantidad }} <span style="color:#6b7c6b;font-size:0.82rem;font-weight:400;">{{ m.elemento.unidad_medida }}</span>
+                </td>
+                <td style="font-weight:600;">
+                    {% if m.valor and m.valor > 0 %}
+                        $ {{ '{:,.0f}'.format(m.valor).replace(',', '.') }}
+                    {% else %}
+                        <span style="color:#bbb;">—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if m.observacion %}
+                        {% if m.observacion|length > 20 %}
+                            <span class="obs-cell obs-expandible" data-obs="{{ m.observacion }}">
+                                {{ m.observacion[:20] }}...
+                            </span>
+                        {% else %}
+                            <span style="color:#3a4f3a;">{{ m.observacion }}</span>
+                        {% endif %}
+                    {% else %}
+                        <span style="color:#bbb;">—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if m.campana %}
+                        <span class="camp-badge {{ 'camp-activa' if m.campana.estado == 'activa' else 'camp-cerrada' }}"
+                              title="{{ m.campana.nombre }}">
+                            {% if m.campana.estado == 'activa' %}
+                                <i class="bi bi-circle-fill" style="font-size:0.5rem;"></i>
+                            {% else %}
+                                <i class="bi bi-circle" style="font-size:0.5rem;"></i>
+                            {% endif %}
+                            {{ m.campana.nombre }}
+                        </span>
+                    {% else %}
+                        <span style="color:#bbb;">—</span>
+                    {% endif %}
+                </td>
+                <td style="font-size:0.85rem;">{{ m.usuario.nombre }}</td>
+                <td class="td-sub">{{ m.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="9">
+                    {% set hay_filtros = filtros.elemento_id or filtros.tipo or filtros.fecha_desde or filtros.fecha_hasta or filtros.campana_id %}
+                    <div class="no-data" style="height:160px;gap:10px;">
+                        <i class="bi {{ 'bi-funnel' if hay_filtros else 'bi-arrow-left-right' }}"></i>
+                        <span style="font-weight:600;color:#3a4f3a;">
+                            {{ 'Sin resultados con esos filtros' if hay_filtros else 'No hay movimientos registrados' }}
+                        </span>
+                        {% if hay_filtros %}
+                        <a href="{{ url_for('movimientos.historial') }}" style="font-size:0.82rem;color:#2e7d32;text-decoration:none;border:1.5px solid #a5d6a7;border-radius:8px;padding:4px 14px;">
+                            <i class="bi bi-x-circle me-1"></i>Limpiar filtros
+                        </a>
+                        {% else %}
+                        <a href="{{ url_for('movimientos.nuevo') }}" style="font-size:0.82rem;color:#fff;text-decoration:none;background:#2e7d32;border-radius:8px;padding:5px 16px;font-weight:600;">
+                            <i class="bi bi-plus-lg me-1"></i>Registrar movimiento
+                        </a>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div><!-- /table-scroll -->
+
+    <div class="chart-card-footer">
         {{ paginar(paginacion, url_anterior, url_siguiente, 'movimientos') }}
     </div>
 </div>
 
-<!-- ── MODAL REPORTE ──────────────────────────────────────────────────────── -->
+
+{% endblock %}
+
+{% block modals %}
+<!-- ── MODAL REPORTE ─────────────────────────────────────────────────────────── -->
 <div class="modal fade" id="modalReporteMovimientos" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title">
-                    <i class="bi bi-file-earmark-pdf me-2"></i>Generar Reporte de Movimientos
+        <div class="modal-content border-0" style="border-radius:14px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.15);">
+            <div class="modal-header" style="background:#fafcfa;border-bottom:1px solid #f0f4f0;">
+                <h5 class="modal-title fw-semibold" style="color:#1a2e1a;font-size:1rem;">
+                    <i class="bi bi-file-earmark-pdf me-2" style="color:#c62828;"></i>Generar Reporte de Movimientos
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="GET" action="{{ url_for('reportes.movimientos_pdf') }}" target="_blank">
-                <div class="modal-body">
-                    <p class="text-muted small mb-3">
+                <div class="modal-body px-4 py-3">
+                    <p style="color:#6b7c6b;font-size:0.85rem;margin-bottom:20px;">
                         Por defecto genera un reporte general. Personaliza los filtros si lo necesitas.
                     </p>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Elemento</label>
-                        <select name="elemento_id" class="form-select">
+                        <label class="form-label fw-semibold" style="font-size:0.85rem;color:#3a4f3a;">Elemento</label>
+                        <select name="elemento_id" class="dash-select w-100" style="padding:8px 12px;">
                             <option value="">Todos los elementos</option>
                             {% for e in elementos %}
                             <option value="{{ e.id }}">{{ e.nombre }}</option>
@@ -138,8 +533,8 @@
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Tipo de movimiento</label>
-                        <select name="tipo" class="form-select">
+                        <label class="form-label fw-semibold" style="font-size:0.85rem;color:#3a4f3a;">Tipo de movimiento</label>
+                        <select name="tipo" class="dash-select w-100" style="padding:8px 12px;">
                             <option value="">Entradas y salidas</option>
                             <option value="entrada">Solo entradas</option>
                             <option value="salida">Solo salidas</option>
@@ -147,18 +542,18 @@
                     </div>
                     <div class="row g-2">
                         <div class="col-6">
-                            <label class="form-label fw-semibold">Desde</label>
-                            <input type="date" name="fecha_desde" class="form-control" max="{{ today }}">
+                            <label class="form-label fw-semibold" style="font-size:0.85rem;color:#3a4f3a;">Desde</label>
+                            <input type="date" name="fecha_desde" class="dash-input-sm w-100" style="padding:8px 12px;" max="{{ today }}">
                         </div>
                         <div class="col-6">
-                            <label class="form-label fw-semibold">Hasta</label>
-                            <input type="date" name="fecha_hasta" class="form-control" max="{{ today }}">
+                            <label class="form-label fw-semibold" style="font-size:0.85rem;color:#3a4f3a;">Hasta</label>
+                            <input type="date" name="fecha_hasta" class="dash-input-sm w-100" style="padding:8px 12px;" max="{{ today }}">
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-danger">
+                <div class="modal-footer" style="border-top:1px solid #f0f4f0;background:#fafcfa;gap:8px;">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn-pdf">
                         <i class="bi bi-file-earmark-pdf"></i> Generar PDF
                     </button>
                 </div>
@@ -166,4 +561,70 @@
         </div>
     </div>
 </div>
+
+{% endblock %}{# cierra block modals #}
+
+<!-- Popover de observación (fixed, no usa backdrop) -->
+<div id="obsPopover">
+    <div class="pop-header"><i class="bi bi-chat-left-text"></i> Observación</div>
+    <div class="pop-body" id="obsPopoverBody"></div>
+</div>
+
+{% block scripts %}
+<script>
+// ── Animaciones de entrada ────────────────────────────────────────────────────
+function entrarConTransicion(el, delay) {
+    if (!el) return;
+    el.style.opacity   = '0';
+    el.style.transform = 'translateY(12px)';
+    setTimeout(function() {
+        el.style.transition = 'opacity 0.34s ease, transform 0.34s ease';
+        el.style.opacity    = '1';
+        el.style.transform  = 'translateY(0)';
+        setTimeout(function() {
+            el.style.transition = '';
+            el.style.transform  = '';
+            el.style.opacity    = '';
+        }, 370);
+    }, delay);
+}
+
+document.querySelectorAll('.kpi-card').forEach(function(card, i) {
+    entrarConTransicion(card, 40 + i * 75);
+});
+
+document.querySelectorAll('.dash-table tbody tr').forEach(function(row, i) {
+    entrarConTransicion(row, 200 + i * 40);
+});
+
+const popover = document.getElementById('obsPopover');
+const popBody = document.getElementById('obsPopoverBody');
+const MARGIN  = 12;
+
+document.querySelectorAll('.obs-expandible').forEach(function(el) {
+    el.addEventListener('mouseenter', function(e) {
+        popBody.textContent = el.dataset.obs;
+        popover.style.display = 'block';
+        posicionar(e);
+    });
+    el.addEventListener('mousemove', posicionar);
+    el.addEventListener('mouseleave', function() {
+        popover.style.display = 'none';
+    });
+});
+
+/* Posiciona el popover siguiendo el cursor sin salirse de la pantalla */
+function posicionar(e) {
+    const pw = popover.offsetWidth;
+    const ph = popover.offsetHeight;
+    let x = e.clientX + MARGIN;
+    let y = e.clientY + MARGIN;
+
+    if (x + pw > window.innerWidth  - MARGIN) x = e.clientX - pw - MARGIN;
+    if (y + ph > window.innerHeight - MARGIN) y = e.clientY - ph - MARGIN;
+
+    popover.style.left = x + 'px';
+    popover.style.top  = y + 'px';
+}
+</script>
 {% endblock %}

@@ -1,0 +1,303 @@
+{% extends 'base.html' %}
+<!-- ventas/detalle.html — Vista de detalle de una factura individual.
+   Muestra: datos del cliente, tabla de productos con subtotales, IVA y total.
+   Si la venta está anulada muestra banner rojo con fecha de anulación.
+   Acciones: anular (modal de confirmación), PDF (link a /ventas/<id>/factura).
+   Lógica del servidor: detalle() línea 287 y anular() línea 296 en venta_controller.py. -->
+{% block title %}Factura #{{ venta.id }} · El Cafetero de Nufi{% endblock %}
+
+{% block styles %}
+<style>
+    /* ── Layout ── */
+    .page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; animation: detCardIn 0.30s ease both; }
+    .page-title  { font-size: 1.4rem; font-weight: 700; color: #1a2e1a; margin: 0; }
+    .btn-back {
+        width: 36px; height: 36px;
+        border-radius: 10px;
+        border: 1.5px solid #d4e0d4;
+        background: #fff;
+        color: #2e7d32;
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: 1rem;
+        text-decoration: none;
+        transition: all 0.15s;
+        flex-shrink: 0;
+    }
+    .btn-back:hover { background: #e8f5e9; border-color: #a5d6a7; color: #1b5e20; }
+
+    /* ── Cards ── */
+    .det-card {
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        border: 1px solid #e8f0e8;
+        overflow: hidden;
+        animation: detCardIn 0.38s ease 0.07s both;
+    }
+    .det-card-header {
+        padding: 14px 24px;
+        border-bottom: 1px solid #f0f4f0;
+        background: #fafcfa;
+        display: flex; align-items: center; justify-content: space-between;
+        font-size: 0.88rem; font-weight: 600; color: #1a2e1a;
+        gap: 10px;
+    }
+    .det-card-header i { color: #2e7d32; }
+    .det-card-body { padding: 24px; }
+
+    @keyframes detCardIn {
+        from { opacity: 0; transform: translateY(14px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Info de cliente y factura ── */
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
+    @media (max-width: 600px) { .info-grid { grid-template-columns: 1fr; } }
+    .info-bloque { display: flex; flex-direction: column; gap: 8px; }
+    .info-label { font-size: 0.72rem; font-weight: 700; color: #94a894; text-transform: uppercase; letter-spacing: 0.05em; }
+    .info-valor { font-size: 0.9rem; color: #2a3d2a; font-weight: 500; }
+    .info-valor.bold { font-weight: 700; font-size: 1rem; color: #1a2e1a; }
+
+    /* ── Tabla de productos ── */
+    .det-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    .det-table thead tr { border-bottom: 2px solid #e8f0e8; }
+    .det-table th { padding: 10px 16px; font-size: 0.72rem; font-weight: 700; color: #6b7c6b; text-transform: uppercase; letter-spacing: 0.05em; text-align: center; }
+    .det-table th:first-child { text-align: center; }
+    .det-table tbody tr { border-bottom: 1px solid #f4f8f4; }
+    .det-table tbody tr:last-child { border-bottom: none; }
+    .det-table tbody tr:hover { background: #f8faf7; }
+    .det-table td { padding: 12px 16px; color: #2a3d2a; vertical-align: middle; text-align: center; }
+    .det-table td:first-child { text-align: center; font-weight: 600; }
+    .det-table tfoot tr { border-top: 2px solid #e8f0e8; }
+    .det-table tfoot td { padding: 12px 16px; font-weight: 700; font-size: 1rem; color: #1a2e1a; text-align: center; }
+
+    /* ── Badge anulada ── */
+    .badge-anulada {
+        display: inline-flex; align-items: center; gap: 5px;
+        background: #fdecea; color: #c62828;
+        border: 1.5px solid #ffcdd2;
+        border-radius: 20px; padding: 4px 14px;
+        font-size: 0.78rem; font-weight: 700;
+    }
+
+    /* ── Banner anulada ── */
+    .banner-anulada {
+        background: #fdecea;
+        border: 1.5px solid #ffcdd2;
+        border-radius: 12px;
+        padding: 14px 20px;
+        margin-bottom: 20px;
+        display: flex; align-items: center; gap: 10px;
+        font-size: 0.88rem; color: #c62828; font-weight: 600;
+    }
+    .banner-anulada i { font-size: 1.2rem; }
+
+    /* ── Botón anular ── */
+    .btn-anular {
+        padding: 8px 18px;
+        border-radius: 9px;
+        border: 1.5px solid #ffcdd2;
+        background: #fff;
+        color: #c62828;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex; align-items: center; gap: 6px;
+        transition: all 0.15s;
+        text-decoration: none;
+    }
+    .btn-anular:hover { background: #fdecea; border-color: #ef9a9a; color: #b71c1c; }
+
+    /* ── Botón PDF ── */
+    .btn-pdf-det {
+        padding: 8px 18px;
+        border-radius: 9px;
+        border: none;
+        background: linear-gradient(135deg, #2e7d32, #388e3c);
+        color: #fff;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+        width: fit-content; align-self: center;
+        box-shadow: 0 2px 8px rgba(46,125,50,0.25);
+        transition: transform 0.15s, box-shadow 0.15s;
+        text-decoration: none;
+    }
+    .btn-pdf-det:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(46,125,50,0.35); color: #fff; }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb-nav">
+    <a href="{{ url_for('ventas.listar') }}">Ventas</a>
+    <span class="bc-sep">›</span>
+    <span class="bc-current">Factura #{{ '%04d' % venta.id }}</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+
+        <!-- Header -->
+        <div class="page-header">
+            <a href="{{ url_for('ventas.listar') }}" class="btn-back">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+            <div>
+                <h4 class="page-title">
+                    Factura
+                    <span style="color:#2e7d32;">#{{ '%04d' % venta.id }}</span>
+                    {% if venta.anulada %}
+                        <span class="badge-anulada ms-2"><i class="bi bi-x-circle-fill"></i> Anulada</span>
+                    {% endif %}
+                </h4>
+                <span style="font-size:0.82rem;color:#6b7c6b;">
+                    {{ venta.fecha.strftime('%d/%m/%Y a las %I:%M %p') if venta.fecha else '—' }}
+                </span>
+            </div>
+        </div>
+
+        <!-- Banner anulada -->
+        {% if venta.anulada %}
+        <div class="banner-anulada">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            Esta factura fue anulada el {{ venta.fecha_anulacion.strftime('%d/%m/%Y a las %I:%M %p') if venta.fecha_anulacion else '—' }}.
+            El stock de los productos fue restaurado.
+        </div>
+        {% endif %}
+
+        <!-- Card principal -->
+        <div class="det-card">
+            <div class="det-card-header">
+                <span><i class="bi bi-receipt me-2"></i>Detalle de la factura</span>
+                <div class="d-flex gap-2">
+                    {% if not venta.anulada %}
+                    <button type="button" class="btn-anular" onclick="bootstrap.Modal.getOrCreateInstance(document.getElementById('modalAnular')).show()"><i class="bi bi-x-circle"></i> Anular</button>
+                    {% endif %}
+                    <a href="{{ url_for('ventas.factura_pdf', id=venta.id) }}" target="_blank" class="btn-pdf-det">
+                        <i class="bi bi-file-earmark-pdf"></i><span>PDF</span>
+                    </a>
+                </div>
+            </div>
+            <div class="det-card-body">
+
+                <!-- Info cliente + factura -->
+                <div class="info-grid">
+                    <div class="info-bloque">
+                        <span class="info-label">Cliente</span>
+                        <span class="info-valor bold">{{ venta.cliente.nombre }}</span>
+                        {% if venta.cliente.documento %}
+                        <span class="info-valor">Doc: {{ venta.cliente.documento }}</span>
+                        {% endif %}
+                        {% if venta.cliente.telefono %}
+                        <span class="info-valor"><i class="bi bi-telephone me-1" style="color:#6b7c6b;"></i>{{ venta.cliente.telefono }}</span>
+                        {% endif %}
+                        {% if venta.cliente.direccion %}
+                        <span class="info-valor"><i class="bi bi-geo-alt me-1" style="color:#6b7c6b;"></i>{{ venta.cliente.direccion }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="info-bloque">
+                        <span class="info-label">Factura</span>
+                        <span class="info-valor bold">N.° {{ '%04d' % venta.id }}</span>
+                        <span class="info-valor">Fecha: {{ venta.fecha.strftime('%d/%m/%Y') if venta.fecha else '—' }}</span>
+                        <span class="info-valor">Hora: {{ venta.fecha.strftime('%I:%M %p') if venta.fecha else '—' }}</span>
+                        <span class="info-valor">Pago: Contado</span>
+                    </div>
+                </div>
+
+                <!-- Tabla de productos -->
+                <div style="overflow-x:auto;">
+                <table class="det-table">
+                    <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th>Cantidad</th>
+                            <th>Unidad</th>
+                            <th>P. Unitario</th>
+                            <th>Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for d in venta.detalles %}
+                        <tr>
+                            <td>{{ d.producto.nombre if d.producto else '(producto eliminado)' }}</td>
+                            <td>{{ d.cantidad|int if d.cantidad == d.cantidad|int else d.cantidad }}</td>
+                            <td>{{ d.producto.unidad_medida if d.producto else '—' }}</td>
+                            <td>${{ "{:,.2f}".format(d.precio_unit) }}</td>
+                            <td>${{ "{:,.2f}".format(d.subtotal) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        {% if venta.iva_porcentaje and venta.iva_porcentaje > 0 %}
+                        <tr>
+                            <td style="color:#6b7c6b;font-size:0.85rem;font-weight:400;">Subtotal</td>
+                            <td colspan="3"></td>
+                            <td style="color:#6b7c6b;font-size:0.85rem;">
+                                ${{ "{:,.2f}".format(venta.subtotal) }}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="color:#6b7c6b;font-size:0.85rem;font-weight:400;">IVA ({{ venta.iva_porcentaje|int }}%)</td>
+                            <td colspan="3"></td>
+                            <td style="color:#6b7c6b;font-size:0.85rem;">
+                                ${{ "{:,.2f}".format(venta.total - venta.subtotal) }}
+                            </td>
+                        </tr>
+                        {% endif %}
+                        <tr>
+                            <td style="color:#6b7c6b;font-size:0.85rem;font-weight:500;">Total</td>
+                            <td colspan="3"></td>
+                            <td style="color:{% if venta.anulada %}#c62828{% else %}#2e7d32{% endif %};">
+                                ${{ "{:,.2f}".format(venta.total) }}
+                                {% if venta.anulada %}<span style="font-size:0.75rem;margin-left:6px;">(anulada)</span>{% endif %}
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block modals %}
+{% if not venta.anulada %}
+<!-- Modal confirmación de anulación -->
+<div class="modal fade" id="modalAnular" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:420px;">
+        <div class="modal-content" style="border-radius:16px;border:none;box-shadow:0 8px 32px rgba(0,0,0,0.15);">
+            <div class="modal-body" style="padding:32px 28px 24px;">
+                <div style="text-align:center;margin-bottom:20px;">
+                    <div style="width:56px;height:56px;border-radius:50%;background:#fdecea;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+                        <i class="bi bi-x-circle" style="font-size:1.5rem;color:#c62828;"></i>
+                    </div>
+                    <h5 style="font-weight:700;color:#1a2e1a;margin-bottom:8px;">Anular factura</h5>
+                    <p style="color:#6b7c6b;font-size:0.9rem;margin:0;">
+                        ¿Estás seguro de que deseas anular la<br>
+                        <strong style="color:#1a2e1a;">Factura #{{ '%04d' % venta.id }}</strong>?<br><br>
+                        <span style="font-size:0.85rem;color:#2e7d32;">
+                            <i class="bi bi-arrow-counterclockwise me-1"></i>
+                            El stock de los productos será restaurado automáticamente.
+                        </span><br>
+                        <span style="font-size:0.82rem;color:#c62828;">Esta acción no se puede deshacer.</span>
+                    </p>
+                </div>
+                <div style="display:flex;gap:10px;">
+                    <button type="button" class="btn w-50" style="border-radius:10px;border:1.5px solid #d4e0d4;color:#3a4f3a;font-weight:600;font-size:0.88rem;" data-bs-dismiss="modal">Cancelar</button>
+                    <form method="POST" action="{{ url_for('ventas.anular', id=venta.id) }}" style="width:50%;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" style="width:100%;border-radius:10px;border:none;background:#c62828;color:#fff;font-weight:700;font-size:0.88rem;padding:8px 0;cursor:pointer;">Sí, anular</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

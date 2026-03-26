@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+<!-- operaciones/hub.html — Página de selección del módulo Operaciones.
+     Opciones: Temporada (campanas) y Trabajadores. -->
+{% block title %}Operaciones · El Cafetero de Nufi{% endblock %}
+
+{% block styles %}
+<style>
+    .hub-header { margin-bottom: 32px; }
+    .hub-title  { font-size: 1.4rem; font-weight: 700; color: #1a2e1a; margin: 0; }
+
+    .hub-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; max-width: 680px; }
+    @media(max-width:540px) { .hub-grid { grid-template-columns: 1fr; } }
+
+    .hub-card {
+        background: #fff; border-radius: 16px;
+        border: 1.5px solid #e8f0e8;
+        box-shadow: 0 3px 14px rgba(0,0,0,0.06);
+        padding: 32px 28px;
+        text-decoration: none;
+        display: flex; flex-direction: column; align-items: flex-start; gap: 14px;
+        transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
+        position: relative; overflow: hidden;
+    }
+    .hub-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 28px rgba(46,125,50,0.14);
+        border-color: #a5d6a7;
+    }
+    .hub-card::after {
+        content: '';
+        position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
+        background: linear-gradient(90deg, #2e7d32, #66bb6a);
+        transform: scaleX(0); transform-origin: left;
+        transition: transform 0.22s ease;
+    }
+    .hub-card:hover::after { transform: scaleX(1); }
+
+    .hub-icon {
+        width: 52px; height: 52px; border-radius: 14px;
+        background: linear-gradient(135deg, #e8f5e9, #f1f8e9);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.5rem; color: #2e7d32;
+    }
+    .hub-card-title { font-size: 1.1rem; font-weight: 700; color: #1a2e1a; margin: 0; }
+    .hub-card-desc  { font-size: 0.83rem; color: #6b7c6b; margin: 0; line-height: 1.5; }
+    .hub-arrow { margin-top: auto; font-size: 0.82rem; font-weight: 600; color: #2e7d32; display: flex; align-items: center; gap: 5px; }
+
+    /* Badge temporada activa */
+    .badge-activa { background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;padding:3px 10px;border-radius:20px;font-size:0.76rem;font-weight:600;display:inline-flex;align-items:center;gap:5px; }
+
+    .hub-header { animation: hubIn 0.3s ease both; }
+    .hub-card   { animation: hubIn 0.38s ease both; }
+    .hub-card:nth-child(2) { animation-delay: 0.06s; }
+    @keyframes hubIn { from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);} }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hub-header">
+    <h4 class="hub-title"><i class="bi bi-grid-3x3-gap me-2" style="color:#2e7d32"></i>Operaciones</h4>
+    <span style="font-size:0.83rem;color:#6b7c6b;">Selecciona el módulo al que quieres acceder</span>
+</div>
+
+<div class="hub-grid">
+
+    <!-- Temporada -->
+    <a href="{{ url_for('campanas.listar') }}" class="hub-card">
+        <div class="hub-icon"><i class="bi bi-calendar2-range"></i></div>
+        <div>
+            <p class="hub-card-title">
+                Temporada
+                {% if campana_activa_global %}
+                <span class="badge-activa ms-2">
+                    <span style="width:6px;height:6px;background:#2e7d32;border-radius:50%;display:inline-block;"></span>
+                    Activa
+                </span>
+                {% endif %}
+            </p>
+            <p class="hub-card-desc">Ciclos productivos de siembra a venta. Agrupa costos e ingresos por temporada.</p>
+        </div>
+        <span class="hub-arrow">Ir a Temporada <i class="bi bi-arrow-right"></i></span>
+    </a>
+
+    <!-- Trabajadores -->
+    <a href="{{ url_for('trabajadores.listar') }}" class="hub-card">
+        <div class="hub-icon"><i class="bi bi-person-badge"></i></div>
+        <div>
+            <p class="hub-card-title">Trabajadores</p>
+            <p class="hub-card-desc">Personal contratado por jornal. Registro de pagos y seguimiento por temporada.</p>
+        </div>
+        <span class="hub-arrow">Ir a Trabajadores <i class="bi bi-arrow-right"></i></span>
+    </a>
+
+</div>
+{% endblock %}

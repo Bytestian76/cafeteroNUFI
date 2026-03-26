@@ -1,3 +1,8 @@
+<!-- base.html — Layout principal de la aplicación.
+     Incluye: navbar con links activos, búsqueda global, sistema de toasts (flash),
+     y el bloque "content" donde cada vista renderiza su contenido.
+     JS global: cerrarToast, ripple en botones, fix backdrop de Bootstrap.
+     Los estilos del navbar y toasts están en este mismo archivo (no hay hoja externa). -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -6,76 +11,286 @@
     <title>{% block title %}El Cafetero de Nufi{% endblock %}</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        body { background-color: #f0f4f0; font-family: 'Segoe UI', sans-serif; }
+
+        /* ── Navbar ── */
+        .navbar { background-color: #1a2e1a !important; border-bottom: 1px solid rgba(165,214,167,0.15); padding: 10px 0; }
+        .navbar-brand { color: #a5d6a7 !important; font-weight: 700; letter-spacing: 0.02em; }
+        .navbar-brand:hover { color: #c8e6c9 !important; }
+        .nav-link { color: rgba(255,255,255,0.72) !important; font-size: 0.88rem; padding: 6px 12px !important; border-radius: 6px; transition: background 0.15s, color 0.15s; }
+        .nav-link:hover { color: #a5d6a7 !important; background: rgba(165,214,167,0.10); }
+        .nav-link.fw-semibold { color: #a5d6a7 !important; background: rgba(165,214,167,0.12); }
+        .dropdown-menu { border: 1px solid #d4e0d4; border-radius: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.10); }
+        .dropdown-toggle { color: rgba(255,255,255,0.82) !important; }
+
+        /* ── Toast alerts ── */
+        .toast-alert {
+            display: flex;
+            flex-direction: column;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+            margin-bottom: 10px;
+            max-height: 120px;
+            transition: opacity 0.45s ease, max-height 0.45s ease, margin-bottom 0.45s ease;
+            animation: toastEntrar 0.35s cubic-bezier(0.34, 1.2, 0.64, 1) forwards;
+        }
+        .toast-alert.saliendo {
+            opacity: 0;
+            max-height: 0;
+            margin-bottom: 0;
+            animation: none;
+        }
+        .toast-cuerpo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 14px;
+        }
+        .toast-icono { font-size: 1.05rem; flex-shrink: 0; }
+        .toast-texto { flex: 1; font-size: 0.88rem; font-weight: 500; line-height: 1.4; }
+        .toast-cerrar {
+            width: 26px; height: 26px;
+            border-radius: 6px; border: none; background: transparent;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            font-size: 1rem; opacity: 0.45; transition: opacity 0.15s, background 0.15s;
+            flex-shrink: 0; padding: 0; line-height: 1;
+        }
+        .toast-cerrar:hover { opacity: 1; background: rgba(0,0,0,0.07); }
+        .toast-barra {
+            height: 3px;
+            transform-origin: left;
+            animation: toastBarra var(--toast-dur, 4.5s) linear forwards;
+        }
+
+        /* Colores */
+        .toast-success { background: #e8f5e9; border-left: 4px solid #2e7d32; }
+        .toast-success .toast-icono, .toast-success .toast-cerrar { color: #2e7d32; }
+        .toast-success .toast-texto { color: #1b5e20; }
+        .toast-success .toast-barra { background: #2e7d32; }
+
+        .toast-danger { background: #fdecea; border-left: 4px solid #c62828; }
+        .toast-danger .toast-icono, .toast-danger .toast-cerrar { color: #c62828; }
+        .toast-danger .toast-texto { color: #b71c1c; }
+        .toast-danger .toast-barra { background: #c62828; }
+
+        .toast-warning { background: #fff8e1; border-left: 4px solid #f57f17; }
+        .toast-warning .toast-icono, .toast-warning .toast-cerrar { color: #f57f17; }
+        .toast-warning .toast-texto { color: #7a5800; }
+        .toast-warning .toast-barra { background: #f57f17; }
+
+        .toast-info { background: #e3f2fd; border-left: 4px solid #1565c0; }
+        .toast-info .toast-icono, .toast-info .toast-cerrar { color: #1565c0; }
+        .toast-info .toast-texto { color: #0d47a1; }
+        .toast-info .toast-barra { background: #1565c0; }
+
+        @keyframes toastEntrar {
+            from { opacity: 0; transform: translateX(24px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes toastBarra {
+            from { transform: scaleX(1); }
+            to   { transform: scaleX(0); }
+        }
+
+        /* ── Page fade-in ── */
+        @keyframes pageFadeIn {
+            from { opacity: 0; transform: translateY(7px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .page-wrapper { animation: pageFadeIn 0.32s ease forwards; }
+
+        /* ── Navbar underline deslizante ── */
+        .nav-link { position: relative; }
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: 2px; left: 12px; right: 12px;
+            height: 2px;
+            background: #a5d6a7;
+            border-radius: 2px;
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform 0.22s ease;
+        }
+        .nav-link:hover::after,
+        .nav-link.fw-semibold::after { transform: scaleX(1); }
+
+        /* ── Ripple en botones ── */
+        .btn { position: relative; overflow: hidden; }
+        .ripple-wave {
+            position: absolute;
+            border-radius: 50%;
+            transform: scale(0);
+            animation: rippleAnim 0.52s linear;
+            background: rgba(255,255,255,0.28);
+            pointer-events: none;
+        }
+        @keyframes rippleAnim {
+            to { transform: scale(4); opacity: 0; }
+        }
+
+        /* ── Modal zoom ── */
+        .modal.fade .modal-dialog {
+            transform: scale(0.91);
+            transition: transform 0.22s cubic-bezier(0.34, 1.25, 0.64, 1);
+        }
+        .modal.show .modal-dialog { transform: scale(1); }
+
+        /* ── Barra de búsqueda global ── */
+        .navbar-search-form { display: flex; align-items: center; }
+        .navbar-search-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .navbar-search-icon {
+            position: absolute;
+            left: 13px;
+            font-size: 0.82rem;
+            color: rgba(165,214,167,0.70);
+            pointer-events: none;
+            transition: color 0.2s;
+            z-index: 1;
+        }
+        .navbar-search-input {
+            background: rgba(255,255,255,0.07);
+            border: 1.5px solid rgba(165,214,167,0.22);
+            border-radius: 22px;
+            color: rgba(255,255,255,0.88);
+            font-size: 0.83rem;
+            padding: 6px 16px 6px 34px;
+            min-width: 230px;
+            outline: none;
+            transition: background 0.2s, border-color 0.2s, box-shadow 0.2s, min-width 0.3s ease;
+        }
+        .navbar-search-input::placeholder { color: rgba(255,255,255,0.38); }
+        .navbar-search-input:focus {
+            background: rgba(255,255,255,0.13);
+            border-color: rgba(165,214,167,0.65);
+            box-shadow: 0 0 0 3px rgba(165,214,167,0.12);
+            min-width: 270px;
+            color: #fff;
+        }
+        .navbar-search-input:focus + .navbar-search-icon,
+        .navbar-search-wrap:focus-within .navbar-search-icon { color: #a5d6a7; }
+        /* Ocultar el botón X nativo del tipo search en webkit */
+        .navbar-search-input::-webkit-search-cancel-button { display: none; }
+
+        /* ── Migas de pan ── */
+        .breadcrumb-nav {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.80rem;
+            color: #94a894;
+            margin-bottom: 18px;
+        }
+        .breadcrumb-nav a {
+            color: #6b7c6b;
+            text-decoration: none;
+            transition: color 0.15s;
+        }
+        .breadcrumb-nav a:hover { color: #2e7d32; }
+        .breadcrumb-nav .bc-sep { color: #c8d8c8; font-size: 0.75rem; }
+        .breadcrumb-nav .bc-current { color: #1a2e1a; font-weight: 600; }
+
+        /* ── Zebra striping global ── */
+        .dash-table tbody tr:nth-child(even),
+        .det-table tbody tr:nth-child(even) { background: #f4f7f4; }
+        /* Clase base para texto secundario en celdas de tabla */
+        .td-sub   { color: #6b7c6b; font-size: 0.82rem; }
+        .td-muted { color: #94a894; font-size: 0.82rem; }
+        /* En filas pares, el texto gris pasa a oscuro para seguir siendo legible */
+        .dash-table tbody tr:nth-child(even) .td-sub,
+        .det-table  tbody tr:nth-child(even) .td-sub  { color: #3a4f3a; }
+        .dash-table tbody tr:nth-child(even) .td-muted,
+        .det-table  tbody tr:nth-child(even) .td-muted { color: #5a7a5a; }
+
+        /* ── Responsive global ── */
+        .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+        @media (max-width: 767px) {
+            /* Header: título arriba, botones abajo */
+            .dash-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+
+            /* Filtros: grupos internos ocupan todo el ancho */
+            .filter-bar .d-flex > .d-flex,
+            .chart-controls .d-flex > .d-flex { width: 100%; }
+            .filter-bar .dash-select,
+            .filter-bar .dash-input-sm,
+            .filter-bar .dash-input-search,
+            .chart-controls .dash-input { flex: 1; min-width: 0; }
+            .btn-filtro-buscar, .btn-filtro-clear, .btn-filtrar,
+            .btn-aplicar { width: 100%; justify-content: center; }
+
+            /* KPI valor más compacto */
+            .kpi-value { font-size: 1.1rem !important; }
+        }
+    </style>
+    {% block styles %}{% endblock %}
 </head>
 <body>
 
 {% if current_user.is_authenticated %}
-<nav class="navbar navbar-expand-lg navbar-dark bg-success">
-    <div class="container-fluid">
+<nav class="navbar navbar-expand-lg navbar-dark">
+    <div class="container-fluid px-4">
         <a class="navbar-brand fw-bold" href="{{ url_for('auth.dashboard') }}">
-            <i class="bi bi-cup-hot-fill"></i> El Cafetero de Nufi
+            <i class="bi bi-cup-hot-fill me-1"></i> El Cafetero de Nufi
         </a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
             <span class="navbar-toggler-icon"></span>
         </button>
 
         <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav me-auto">
+            <ul class="navbar-nav me-auto gap-1">
 
                 <li class="nav-item">
-                    <a class="nav-link {{ 'active fw-semibold' if request.path.startswith('/inventario') }}"
-                       href="{{ url_for('inventario.listar') }}">
-                        <i class="bi bi-box-seam"></i> Inventario
-                    </a>
+                    <a class="nav-link {{ 'fw-semibold' if request.path.startswith('/inventario') }}" href="{{ url_for('inventario.listar') }}"><i class="bi bi-box-seam"></i> Inventario</a>
                 </li>
 
                 <li class="nav-item">
-                    <a class="nav-link {{ 'active fw-semibold' if request.path.startswith('/movimientos') }}"
-                       href="{{ url_for('movimientos.historial') }}">
-                        <i class="bi bi-arrow-left-right"></i> Movimientos
-                    </a>
+                    <a class="nav-link {{ 'fw-semibold' if request.path.startswith('/movimientos') }}" href="{{ url_for('movimientos.historial') }}"><i class="bi bi-arrow-left-right"></i> Movimientos</a>
                 </li>
 
                 <li class="nav-item">
-                    <a class="nav-link {{ 'active fw-semibold' if request.path.startswith('/ventas') and not request.path.startswith('/ventas/clientes') }}"
-                       href="{{ url_for('ventas.listar') }}">
-                        <i class="bi bi-cart3"></i> Ventas
-                    </a>
+                    <a class="nav-link {{ 'fw-semibold' if request.path.startswith('/productos') }}" href="{{ url_for('productos.listar') }}"><i class="bi bi-bag"></i> Productos</a>
                 </li>
 
                 <li class="nav-item">
-                    <a class="nav-link {{ 'active fw-semibold' if request.path.startswith('/ventas/clientes') }}"
-                       href="{{ url_for('ventas.listar_clientes') }}">
-                        <i class="bi bi-people"></i> Clientes
-                    </a>
+                    <a class="nav-link {{ 'fw-semibold' if request.path.startswith('/ventas') }}" href="{{ url_for('ventas.hub_ventas') }}"><i class="bi bi-cart3"></i> Ventas</a>
                 </li>
 
                 <li class="nav-item">
-                    <a class="nav-link {{ 'active fw-semibold' if request.path.startswith('/productos') }}"
-                       href="{{ url_for('productos.listar') }}">
-                        <i class="bi bi-bag"></i> Productos
-                    </a>
-                </li>
-
-                <li class="nav-item">
-                    <a class="nav-link {{ 'active fw-semibold' if request.path.startswith('/usuarios') }}"
-                       href="{{ url_for('auth.listar_usuarios') }}">
-                        <i class="bi bi-shield-lock"></i> Usuarios
+                    <a class="nav-link {{ 'fw-semibold' if request.path.startswith('/campanas') or request.path.startswith('/trabajadores') or request.path.startswith('/operaciones') or request.path.startswith('/jornales') }}" href="{{ url_for('trabajadores.hub_operaciones') }}" style="position:relative;">
+                        <i class="bi bi-grid-3x3-gap"></i> Operaciones
+                        {% if campana_activa_global %}
+                        <span style="position:absolute;top:6px;right:4px;width:7px;height:7px;background:#4caf50;border-radius:50%;border:1.5px solid #1a2e1a;display:inline-block;"></span>
+                        {% endif %}
                     </a>
                 </li>
 
             </ul>
 
+            <!-- Búsqueda global -->
+            <form class="navbar-search-form me-3" action="{{ url_for('auth.buscar') }}" method="GET" role="search">
+                <div class="navbar-search-wrap">
+                    <i class="bi bi-search navbar-search-icon"></i>
+                    <input class="navbar-search-input" type="search" name="q" placeholder="Buscar producto, cliente…" value="{{ request.args.get('q', '') }}" autocomplete="off">
+                </div>
+            </form>
+
             <ul class="navbar-nav ms-auto">
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                        <i class="bi bi-person-circle"></i> {{ current_user.nombre }}
-                        <span class="badge bg-warning text-dark ms-1">admin</span>
+                    <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#" role="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-person-circle fs-5"></i>
+                        <span>{{ current_user.nombre }}</span>
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end">
                         <li>
                             <a class="dropdown-item text-danger" href="{{ url_for('auth.logout') }}">
-                                <i class="bi bi-box-arrow-right"></i> Cerrar sesión
+                                <i class="bi bi-box-arrow-right me-2"></i>Cerrar sesión
                             </a>
                         </li>
                     </ul>
@@ -86,22 +301,107 @@
 </nav>
 {% endif %}
 
-<div class="container mt-4">
+<div class="container-fluid px-4 mt-4 page-wrapper">
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-            {% for category, message in messages %}\
-                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            {% for category, message in messages %}
+            <div class="toast-alert toast-{{ category }}" role="alert">
+                <div class="toast-cuerpo">
+                    <span class="toast-icono">
+                        {% if category == 'success' %}<i class="bi bi-check-circle-fill"></i>
+                        {% elif category == 'danger'  %}<i class="bi bi-x-circle-fill"></i>
+                        {% elif category == 'warning' %}<i class="bi bi-exclamation-triangle-fill"></i>
+                        {% else %}<i class="bi bi-info-circle-fill"></i>{% endif %}
+                    </span>
+                    <span class="toast-texto">{{ message }}</span>
+                    <button class="toast-cerrar" onclick="cerrarToast(this.closest('.toast-alert'))">
+                        <i class="bi bi-x"></i>
+                    </button>
                 </div>
+                <div class="toast-barra"></div>
+            </div>
             {% endfor %}
         {% endif %}
     {% endwith %}
 
+    {% block breadcrumb %}{% endblock %}
     {% block content %}{% endblock %}
 </div>
 
+<!-- Modales fuera del page-wrapper para evitar conflictos de stacking context con el backdrop de Bootstrap -->
+{% block modals %}{% endblock %}
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const TOAST_DUR = 3000; // ms antes de desaparecer
+
+function cerrarToast(el) {
+    el.classList.add('saliendo');
+    setTimeout(function() { el.remove(); }, 460);
+}
+
+/* Muestra un toast desde JS (sin recarga). Usado por acciones AJAX. */
+function mostrarToast(msg, tipo) {
+    tipo = tipo || 'success';
+    const iconos = { success: 'bi-check-circle-fill', danger: 'bi-x-circle-fill', warning: 'bi-exclamation-triangle-fill', info: 'bi-info-circle-fill' };
+    const el = document.createElement('div');
+    el.className = 'toast-alert toast-' + tipo;
+    el.setAttribute('role', 'alert');
+    el.innerHTML =
+        '<div class="toast-cuerpo">' +
+        '<span class="toast-icono"><i class="bi ' + (iconos[tipo] || iconos.success) + '"></i></span>' +
+        '<span class="toast-texto">' + msg + '</span>' +
+        '<button class="toast-cerrar" onclick="cerrarToast(this.closest(\'.toast-alert\'))"><i class="bi bi-x"></i></button>' +
+        '</div><div class="toast-barra"></div>';
+    const wrapper = document.querySelector('.page-wrapper');
+    wrapper.insertBefore(el, wrapper.firstChild);
+    el.querySelector('.toast-barra').style.setProperty('--toast-dur', TOAST_DUR + 'ms');
+    var timer = setTimeout(function() { cerrarToast(el); }, TOAST_DUR);
+    el.addEventListener('mouseenter', function() { clearTimeout(timer); el.querySelector('.toast-barra').style.animationPlayState = 'paused'; });
+    el.addEventListener('mouseleave', function() { el.querySelector('.toast-barra').style.animationPlayState = 'running'; timer = setTimeout(function() { cerrarToast(el); }, 1800); });
+}
+
+document.querySelectorAll('.toast-alert').forEach(function(el) {
+    // Sincroniza la duración de la barra con el timer
+    el.querySelector('.toast-barra').style.setProperty('--toast-dur', TOAST_DUR + 'ms');
+
+    var timer = setTimeout(function() { cerrarToast(el); }, TOAST_DUR);
+
+    // Pausa el timer y la barra si el usuario pasa el mouse encima
+    el.addEventListener('mouseenter', function() {
+        clearTimeout(timer);
+        el.querySelector('.toast-barra').style.animationPlayState = 'paused';
+    });
+    el.addEventListener('mouseleave', function() {
+        el.querySelector('.toast-barra').style.animationPlayState = 'running';
+        timer = setTimeout(function() { cerrarToast(el); }, 1800);
+    });
+});
+</script>
 {% block scripts %}{% endblock %}
+<script>
+/* ── Fix: limpiar backdrop huérfano al cerrar cualquier modal ── */
+document.addEventListener('hidden.bs.modal', function() {
+    if (!document.querySelector('.modal.show')) {
+        document.querySelectorAll('.modal-backdrop').forEach(function(el) { el.remove(); });
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('overflow');
+        document.body.style.removeProperty('padding-right');
+    }
+});
+
+/* ── Ripple en botones ── */
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.btn');
+    if (!btn) return;
+    const rect = btn.getBoundingClientRect();
+    const size = Math.max(rect.width, rect.height);
+    const wave = document.createElement('span');
+    wave.classList.add('ripple-wave');
+    wave.style.cssText = `width:${size}px;height:${size}px;left:${e.clientX - rect.left - size/2}px;top:${e.clientY - rect.top - size/2}px`;
+    btn.appendChild(wave);
+    wave.addEventListener('animationend', () => wave.remove());
+});
+</script>
 </body>
 </html>

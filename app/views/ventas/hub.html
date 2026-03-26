@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+<!-- ventas/hub.html — Página de selección del módulo Ventas.
+     Opciones: Facturas y Clientes. -->
+{% block title %}Ventas · El Cafetero de Nufi{% endblock %}
+
+{% block styles %}
+<style>
+    .hub-header { margin-bottom: 32px; }
+    .hub-title  { font-size: 1.4rem; font-weight: 700; color: #1a2e1a; margin: 0; }
+
+    .hub-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; max-width: 680px; }
+    @media(max-width:540px) { .hub-grid { grid-template-columns: 1fr; } }
+
+    .hub-card {
+        background: #fff; border-radius: 16px;
+        border: 1.5px solid #e8f0e8;
+        box-shadow: 0 3px 14px rgba(0,0,0,0.06);
+        padding: 32px 28px;
+        text-decoration: none;
+        display: flex; flex-direction: column; align-items: flex-start; gap: 14px;
+        transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
+        position: relative; overflow: hidden;
+    }
+    .hub-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 28px rgba(46,125,50,0.14);
+        border-color: #a5d6a7;
+    }
+    .hub-card::after {
+        content: '';
+        position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
+        background: linear-gradient(90deg, #2e7d32, #66bb6a);
+        transform: scaleX(0); transform-origin: left;
+        transition: transform 0.22s ease;
+    }
+    .hub-card:hover::after { transform: scaleX(1); }
+
+    .hub-icon {
+        width: 52px; height: 52px; border-radius: 14px;
+        background: linear-gradient(135deg, #e8f5e9, #f1f8e9);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.5rem; color: #2e7d32;
+    }
+    .hub-card-title { font-size: 1.1rem; font-weight: 700; color: #1a2e1a; margin: 0; }
+    .hub-card-desc  { font-size: 0.83rem; color: #6b7c6b; margin: 0; line-height: 1.5; }
+    .hub-arrow { margin-top: auto; font-size: 0.82rem; font-weight: 600; color: #2e7d32; display: flex; align-items: center; gap: 5px; }
+
+    .hub-header { animation: hubIn 0.3s ease both; }
+    .hub-card   { animation: hubIn 0.38s ease both; }
+    .hub-card:nth-child(2) { animation-delay: 0.06s; }
+    @keyframes hubIn { from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);} }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hub-header">
+    <h4 class="hub-title"><i class="bi bi-cart3 me-2" style="color:#2e7d32"></i>Ventas</h4>
+    <span style="font-size:0.83rem;color:#6b7c6b;">Selecciona el módulo al que quieres acceder</span>
+</div>
+
+<div class="hub-grid">
+
+    <!-- Facturas -->
+    <a href="{{ url_for('ventas.listar') }}" class="hub-card">
+        <div class="hub-icon"><i class="bi bi-receipt"></i></div>
+        <div>
+            <p class="hub-card-title">Facturas</p>
+            <p class="hub-card-desc">Registro y consulta de ventas. Genera facturas en PDF y anula transacciones.</p>
+        </div>
+        <span class="hub-arrow">Ir a Facturas <i class="bi bi-arrow-right"></i></span>
+    </a>
+
+    <!-- Clientes -->
+    <a href="{{ url_for('ventas.listar_clientes') }}" class="hub-card">
+        <div class="hub-icon"><i class="bi bi-people"></i></div>
+        <div>
+            <p class="hub-card-title">Clientes</p>
+            <p class="hub-card-desc">Gestión del directorio de clientes. Agrega, edita y consulta el historial de compras.</p>
+        </div>
+        <span class="hub-arrow">Ir a Clientes <i class="bi bi-arrow-right"></i></span>
+    </a>
+
+</div>
+{% endblock %}

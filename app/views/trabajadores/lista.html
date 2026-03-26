@@ -1,0 +1,129 @@
+{% extends 'base.html' %}
+<!-- trabajadores/lista.html — Lista de todos los trabajadores registrados.
+     Controlador: trabajador_controller.py -->
+{% block title %}Trabajadores · El Cafetero de Nufi{% endblock %}
+
+{% block styles %}
+<style>
+    .dash-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+    .dash-title  { font-size: 1.4rem; font-weight: 700; color: #1a2e1a; margin: 0; }
+
+    .main-card {
+        background: #fff; border-radius: 14px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        border: 1px solid #e8f0e8; overflow: hidden;
+    }
+    .main-card-header {
+        padding: 14px 20px; border-bottom: 1px solid #f0f4f0;
+        background: #fafcfa; font-size: 0.85rem; font-weight: 600; color: #3a4f3a;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .main-card-header i { color: #2e7d32; }
+
+    .t-table { width: 100%; border-collapse: collapse; }
+    .t-table th { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7c6b; padding: 12px 16px; border-bottom: 1px solid #f0f4f0; white-space: nowrap; text-align: center; }
+    .t-table td { padding: 13px 16px; border-bottom: 1px solid #f7faf7; vertical-align: middle; font-size: 0.88rem; text-align: center; }
+    .t-table tr:last-child td { border-bottom: none; }
+    .t-table tr:hover td { background: #fafcfa; }
+
+    .badge-activo   { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; padding: 3px 10px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; }
+    .badge-inactivo { background: #f3f3f3; color: #6b7c6b; border: 1px solid #d4d4d4; padding: 3px 10px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; }
+
+    .btn-nuevo {
+        padding: 8px 18px; border-radius: 9px; border: none;
+        background: linear-gradient(135deg, #2e7d32, #388e3c);
+        color: #fff; font-size: 0.88rem; font-weight: 600;
+        text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+        box-shadow: 0 2px 8px rgba(46,125,50,0.25); transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .btn-nuevo:hover { color: #fff; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(46,125,50,0.35); }
+    .btn-accion {
+        padding: 5px 12px; border-radius: 7px; border: 1.5px solid #d4e0d4; background: #fff;
+        color: #2e7d32; font-size: 0.8rem; font-weight: 600; text-decoration: none;
+        display: inline-flex; align-items: center; gap: 4px; transition: all 0.15s;
+    }
+    .btn-accion:hover { background: #e8f5e9; border-color: #a5d6a7; color: #1b5e20; }
+
+    .empty-state { text-align: center; padding: 48px 24px; color: #6b7c6b; }
+    .empty-state i { font-size: 2.5rem; color: #a5d6a7; display: block; margin-bottom: 12px; }
+
+    .dash-header { animation: fadeUp 0.3s ease both; }
+    .main-card   { animation: fadeUp 0.38s ease 0.06s both; }
+    @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb-nav">
+    <a href="{{ url_for('trabajadores.hub_operaciones') }}">Operaciones</a>
+    <span class="bc-sep">›</span>
+    <span class="bc-current">Trabajadores</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="dash-header">
+    <div>
+        <h4 class="dash-title"><i class="bi bi-person-badge me-2" style="color:#2e7d32"></i>Trabajadores</h4>
+        <span style="font-size:0.82rem;color:#6b7c6b;">Personal contratado por jornal</span>
+    </div>
+    <a href="{{ url_for('trabajadores.nuevo') }}" class="btn-nuevo">
+        <i class="bi bi-plus-lg"></i> Nuevo trabajador
+    </a>
+</div>
+
+<div class="main-card">
+    <div class="main-card-header">
+        <i class="bi bi-list-ul"></i> Lista de trabajadores
+        <span style="margin-left:auto;font-weight:400;color:#94a894;">{{ trabajadores|length }} registrados</span>
+    </div>
+
+    {% if trabajadores %}
+    <div class="table-scroll">
+        <table class="t-table">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Documento</th>
+                    <th>Teléfono</th>
+                    <th>Estado</th>
+                    <th>Jornales</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in trabajadores %}
+                <tr>
+                    <td style="font-weight:600;color:#1a2e1a;">{{ t.nombre }}</td>
+                    <td class="td-sub">{{ t.documento or '—' }}</td>
+                    <td class="td-sub">{{ t.telefono or '—' }}</td>
+                    <td>
+                        {% if t.activo %}
+                        <span class="badge-activo">Activo</span>
+                        {% else %}
+                        <span class="badge-inactivo">Inactivo</span>
+                        {% endif %}
+                    </td>
+                    <td class="td-sub">{{ t.jornales|length }}</td>
+                    <td>
+                        <a href="{{ url_for('trabajadores.detalle', id=t.id) }}" class="btn-accion">
+                            <i class="bi bi-eye"></i> Ver
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="bi bi-person-x"></i>
+        <p style="margin:0;font-weight:600;">No hay trabajadores registrados</p>
+        <p style="font-size:0.82rem;margin-top:4px;">Agrega el primer trabajador para poder registrar jornales.</p>
+        <a href="{{ url_for('trabajadores.nuevo') }}" class="btn-nuevo mt-3" style="display:inline-flex;">
+            <i class="bi bi-plus-lg"></i> Nuevo trabajador
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

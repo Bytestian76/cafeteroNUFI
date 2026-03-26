@@ -1,154 +1,553 @@
 {% extends 'base.html' %}
 {% from 'paginacion.html' import paginar %}
+<!-- ventas/lista.html — Historial paginado de facturas con filtros.
+   Filtros: cliente, producto, rango de fechas. Total recaudado excluye anuladas.
+   Acciones por fila: ver detalle, PDF individual, anular (modal).
+   Modal PDF global: genera reporte de ventas via /reportes/ventas/pdf.
+   Lógica del servidor: listar() en venta_controller.py línea 44. -->
 {% block title %}Ventas · El Cafetero de Nufi{% endblock %}
 
+{% block styles %}
+<style>
+    /* ── Layout ── */
+    .dash-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; }
+    .dash-title  { font-size: 1.5rem; font-weight: 700; color: #1a2e1a; margin: 0; }
+
+    /* ── KPI mini ── */
+    .kpi-card {
+        background: #fff;
+        border-radius: 14px;
+        padding: 16px 20px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        border: 1px solid #e8f0e8;
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.09); }
+    .kpi-icon  { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; flex-shrink: 0; }
+    .kpi-green { background: #e8f5e9; color: #2e7d32; }
+    .kpi-blue  { background: #e3f2fd; color: #1565c0; }
+    .kpi-amber { background: #fff8e1; color: #f57f17; }
+    .kpi-teal  { background: #e0f2f1; color: #00695c; }
+    .kpi-value { font-size: 1.4rem; font-weight: 800; color: #1a2e1a; line-height: 1; }
+    .kpi-label { font-size: 0.75rem; color: #6b7c6b; margin-top: 3px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
+
+    /* ── Filtros ── */
+    .filter-bar {
+        background: #fff;
+        border-radius: 12px;
+        border: 1px solid #e8f0e8;
+        padding: 12px 18px;
+        box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+        margin-bottom: 20px;
+    }
+    .ctrl-label { font-size: 0.82rem; font-weight: 600; color: #3a4f3a; white-space: nowrap; }
+    .dash-select {
+        border: 1.5px solid #d4e0d4;
+        border-radius: 8px;
+        padding: 5px 10px;
+        font-size: 0.85rem;
+        color: #1b2e1b;
+        background: #fff;
+        outline: none;
+        transition: border-color 0.2s;
+        cursor: pointer;
+    }
+    .dash-select:focus { border-color: #2e7d32; box-shadow: 0 0 0 3px rgba(46,125,50,0.10); }
+    .dash-input-sm {
+        border: 1.5px solid #d4e0d4;
+        border-radius: 8px;
+        padding: 5px 10px;
+        font-size: 0.85rem;
+        color: #1b2e1b;
+        background: #fff;
+        outline: none;
+        transition: border-color 0.2s;
+    }
+    .dash-input-sm:focus { border-color: #2e7d32; box-shadow: 0 0 0 3px rgba(46,125,50,0.10); }
+    .btn-filtro-buscar {
+        padding: 5px 14px;
+        border-radius: 8px;
+        border: none;
+        background: linear-gradient(135deg, #2e7d32, #388e3c);
+        color: #fff;
+        font-size: 0.82rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex; align-items: center; gap: 5px;
+        box-shadow: 0 2px 6px rgba(46,125,50,0.20);
+        transition: all 0.15s;
+    }
+    .btn-filtro-buscar:hover { box-shadow: 0 3px 10px rgba(46,125,50,0.30); transform: translateY(-1px); }
+    .btn-filtro-clear {
+        padding: 5px 12px;
+        border-radius: 8px;
+        border: 1.5px solid #d4e0d4;
+        background: #fff;
+        font-size: 0.82rem;
+        color: #6b7c6b;
+        cursor: pointer;
+        transition: all 0.15s;
+        text-decoration: none;
+        display: inline-flex; align-items: center; gap: 4px;
+    }
+    .btn-filtro-clear:hover { background: #f5f5f5; border-color: #bbb; color: #333; }
+
+    /* ── Tabla ── */
+    .chart-card {
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        border: 1px solid #e8f0e8;
+        overflow: hidden;
+    }
+    .chart-card-header {
+        padding: 14px 20px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: #1a2e1a;
+        border-bottom: 1px solid #f0f4f0;
+        display: flex; align-items: center; gap: 8px;
+        background: #fafcfa;
+    }
+    .chart-card-header i { color: #2e7d32; font-size: 1rem; }
+    .chart-card-footer { padding: 12px 20px; border-top: 1px solid #f0f4f0; background: #fafcfa; }
+
+    .dash-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    .dash-table thead tr { border-bottom: 2px solid #e8f0e8; }
+    .dash-table th { padding: 10px 16px; font-size: 0.75rem; font-weight: 700; color: #6b7c6b; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; text-align: center; }
+    .dash-table tbody tr { border-bottom: 1px solid #f4f8f4; transition: background 0.12s; }
+    .dash-table tbody tr:last-child { border-bottom: none; }
+    .dash-table tbody tr:hover { background: #f8faf7; }
+    .dash-table td { padding: 11px 16px; color: #2a3d2a; vertical-align: middle; text-align: center; }
+
+    /* ── Badges ── */
+    .factura-badge {
+        display: inline-flex; align-items: center; gap: 4px;
+        background: #e8f5e9; color: #2e7d32;
+        border-radius: 20px; padding: 3px 10px;
+        font-size: 0.75rem; font-weight: 700;
+    }
+    .prod-list  { display: inline-flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+    .prod-item  { display: flex; align-items: center; gap: 5px; font-size: 0.82rem; flex-wrap: wrap; }
+    .prod-name  { font-weight: 600; color: #1a2e1a; }
+    .prod-sep   { color: #c0cfc0; font-size: 0.7rem; }
+    .prod-qty   { color: #94a894; }
+    .prod-extra { display: none; }
+    .btn-prod-toggle {
+        margin-top: 2px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: #2e7d32;
+        background: #e8f5e9;
+        border: 1px solid #a5d6a7;
+        border-radius: 20px;
+        padding: 1px 9px;
+        cursor: pointer;
+        transition: background 0.15s;
+        align-self: flex-start;
+    }
+    .btn-prod-toggle:hover { background: #c8e6c9; }
+    .total-cell { font-weight: 700; color: #2e7d32; font-size: 0.95rem; }
+
+    /* ── Botones principales ── */
+    .btn-primary-venta {
+        padding: 7px 16px;
+        border-radius: 9px;
+        border: none;
+        background: linear-gradient(135deg, #2e7d32, #388e3c);
+        color: #fff;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex; align-items: center; gap: 6px;
+        box-shadow: 0 2px 8px rgba(46,125,50,0.25);
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .btn-primary-venta:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(46,125,50,0.35); color: #fff; }
+    .btn-pdf {
+        padding: 7px 16px;
+        border-radius: 9px;
+        border: 1.5px solid #ffcdd2;
+        background: #fff;
+        color: #c62828;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex; align-items: center; gap: 6px;
+        transition: all 0.15s;
+    }
+    .btn-pdf:hover { background: #fdecea; border-color: #ef9a9a; color: #b71c1c; }
+
+    /* ── Botones de acción por fila ── */
+    .btn-accion-row {
+        width: 32px; height: 32px;
+        border-radius: 8px;
+        border: 1.5px solid;
+        background: #fff;
+        cursor: pointer;
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: 0.85rem;
+        text-decoration: none;
+        transition: all 0.15s;
+    }
+    .btn-accion-pdf   { border-color: #ffcdd2; color: #c62828; }
+    .btn-accion-pdf:hover { background: #fdecea; border-color: #ef9a9a; color: #b71c1c; }
+    .btn-accion-eye   { border-color: #d4e0d4; color: #2e7d32; }
+    .btn-accion-eye:hover { background: #e8f5e9; border-color: #a5d6a7; color: #1b5e20; }
+    .btn-accion-anul  { border-color: #ffcdd2; color: #c62828; }
+    .btn-accion-anul:hover { background: #fdecea; border-color: #ef9a9a; color: #b71c1c; }
+
+    /* ── Fila / badge anulada ── */
+    .row-anulada { opacity: 0.55; }
+    .row-anulada:hover { background: #fff8f8 !important; }
+    .badge-anulada {
+        display: inline-flex; align-items: center; gap: 3px;
+        background: #fdecea; color: #c62828;
+        border: 1px solid #ffcdd2;
+        border-radius: 20px; padding: 2px 9px;
+        font-size: 0.72rem; font-weight: 700;
+    }
+    .badge-campana {
+        display: inline-flex; align-items: center; gap: 3px;
+        background: #e8f5e9; color: #2e7d32;
+        border: 1px solid #a5d6a7;
+        border-radius: 20px; padding: 2px 9px;
+        font-size: 0.72rem; font-weight: 600;
+        max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    /* ── Sin datos ── */
+    .no-data { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 140px; color: #94a894; font-size: 0.88rem; gap: 8px; }
+    .no-data i { font-size: 2rem; opacity: 0.4; }
+
+    /* ── Mobile ── */
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .dash-table   { min-width: 680px; }
+
+    @media (max-width: 767px) {
+        .dash-header  { flex-direction: column; align-items: flex-start; gap: 12px; }
+        .filter-bar .d-flex { flex-direction: column; align-items: flex-start; gap: 10px !important; }
+        .filter-bar .d-flex > div,
+        .filter-bar .d-flex > button,
+        .filter-bar .d-flex > a { width: 100%; }
+        .dash-select, .dash-input-sm { width: 100%; box-sizing: border-box; }
+        .btn-filtro-buscar, .btn-filtro-clear { width: 100%; justify-content: center; }
+        .kpi-value { font-size: 1.1rem; }
+
+        /* En móvil: tabla se convierte en tarjetas */
+        .dash-table, .dash-table thead, .dash-table tbody,
+        .dash-table th, .dash-table td, .dash-table tr { display: block; }
+        .dash-table thead { display: none; }
+        .dash-table tbody tr {
+            border: 1px solid #e8f0e8;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            padding: 12px;
+            background: #fff;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+        }
+        .dash-table tbody tr:hover { background: #f8faf7; }
+        .dash-table td {
+            text-align: left !important;
+            padding: 5px 0;
+            border: none;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            font-size: 0.85rem;
+        }
+        .dash-table td::before {
+            content: attr(data-label);
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: #94a894;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            min-width: 70px;
+            flex-shrink: 0;
+            padding-top: 1px;
+        }
+        .prod-list { align-items: flex-start; }
+        .total-cell { font-size: 1rem; }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h3 class="fw-bold"><i class="bi bi-cart3"></i> Ventas</h3>
+
+<!-- Header -->
+<div class="dash-header">
+    <div>
+        <h4 class="dash-title"><i class="bi bi-receipt me-2" style="color:#2e7d32"></i>Ventas</h4>
+        <span style="font-size:0.82rem;color:#6b7c6b;">Historial de facturas y recaudo</span>
+    </div>
     <div class="d-flex gap-2">
-        <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#modalReporteVentas">
-            <i class="bi bi-file-earmark-pdf"></i> Generar Reporte PDF
+        <button class="btn-pdf" data-bs-toggle="modal" data-bs-target="#modalReporteVentas">
+            <i class="bi bi-file-earmark-pdf"></i> Reporte PDF
         </button>
-        <a href="{{ url_for('ventas.nueva') }}" class="btn btn-warning">
+        <a href="{{ url_for('ventas.nueva') }}" class="btn-primary-venta">
             <i class="bi bi-plus-lg"></i> Nueva Factura
         </a>
     </div>
 </div>
 
-<!-- Filtros -->
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-body">
-        <form method="GET">
-            <div class="row g-2 align-items-end">
-                <div class="col-md-3">
-                    <label class="form-label fw-semibold">Cliente</label>
-                    <select name="cliente_id" class="form-select form-select-sm">
-                        <option value="">Todos los clientes</option>
-                        {% for c in clientes %}
-                        <option value="{{ c.id }}" {{ 'selected' if filtros.cliente_id == c.id|string }}>
-                            {{ c.nombre }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label fw-semibold">Producto</label>
-                    <select name="producto_id" class="form-select form-select-sm">
-                        <option value="">Todos los productos</option>
-                        {% for p in productos %}
-                        <option value="{{ p.id }}" {{ 'selected' if filtros.producto_id == p.id|string }}>
-                            {{ p.nombre }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label fw-semibold">Desde</label>
-                    <input type="date" name="fecha_desde" class="form-control form-control-sm"
-                           max="{{ today }}" value="{{ filtros.fecha_desde }}">
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label fw-semibold">Hasta</label>
-                    <input type="date" name="fecha_hasta" class="form-control form-control-sm"
-                           max="{{ today }}" value="{{ filtros.fecha_hasta }}">
-                </div>
-                <div class="col-md-1">
-                    <button type="submit" class="btn btn-success btn-sm w-100">
-                        <i class="bi bi-search"></i>
-                    </button>
-                </div>
-                <div class="col-md-1">
-                    <a href="{{ url_for('ventas.listar') }}" class="btn btn-outline-secondary btn-sm w-100">
-                        <i class="bi bi-x"></i>
-                    </a>
+<!-- Mini KPIs -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card">
+            <div class="kpi-icon kpi-blue"><i class="bi bi-receipt"></i></div>
+            <div>
+                <div class="kpi-value">{{ paginacion.total }}</div>
+                <div class="kpi-label">Total facturas</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card">
+            <div class="kpi-icon kpi-green"><i class="bi bi-cash-stack"></i></div>
+            <div>
+                <div class="kpi-value" style="font-size:1.1rem;">${{ "{:,.0f}".format(total_pagina) }}</div>
+                <div class="kpi-label">
+                    Total recaudado{% if filtros.cliente_id or filtros.producto_id or filtros.fecha_desde or filtros.fecha_hasta %} (filtrado){% endif %}
                 </div>
             </div>
-        </form>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card">
+            <div class="kpi-icon kpi-teal"><i class="bi bi-people"></i></div>
+            <div>
+                <div class="kpi-value">{{ clientes | length }}</div>
+                <div class="kpi-label">Clientes registrados</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card">
+            <div class="kpi-icon kpi-amber"><i class="bi bi-funnel"></i></div>
+            <div>
+                <div class="kpi-value" style="font-size:1rem;">
+                    {% if filtros.cliente_id or filtros.producto_id or filtros.fecha_desde or filtros.fecha_hasta %}
+                        Filtrado
+                    {% else %}
+                        General
+                    {% endif %}
+                </div>
+                <div class="kpi-label">Modo de vista</div>
+            </div>
+        </div>
     </div>
 </div>
 
-<!-- Resumen rápido -->
-{% if paginacion.total > 0 %}
-<div class="row g-3 mb-4">
-    <div class="col-md-6">
-        <div class="card border-0 shadow-sm text-center p-3">
-            <div class="fw-bold fs-4">{{ paginacion.total }}</div>
-            <div class="text-muted small">Total facturas</div>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card border-0 shadow-sm text-center p-3">
-            <div class="fw-bold fs-4 text-success">${{ "%.2f"|format(total_pagina) }}</div>
-            <div class="text-muted small">Total recaudado
-                {% if filtros.cliente_id or filtros.producto_id or filtros.fecha_desde or filtros.fecha_hasta %}
-                (filtrado){% endif %}
+<!-- Filtros -->
+<form method="GET" id="formFiltros">
+    <div class="filter-bar">
+        <div class="d-flex align-items-center gap-3 flex-wrap">
+            <span class="ctrl-label"><i class="bi bi-funnel me-1"></i>Filtros</span>
+
+            <div class="d-flex align-items-center gap-2">
+                <span class="ctrl-label" style="font-weight:500;">Cliente:</span>
+                <select name="cliente_id" class="dash-select">
+                    <option value="">Todos</option>
+                    {% for c in clientes %}
+                    <option value="{{ c.id }}" {{ 'selected' if filtros.cliente_id == c.id|string }}>
+                        {{ c.nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
             </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <span class="ctrl-label" style="font-weight:500;">Producto:</span>
+                <select name="producto_id" class="dash-select">
+                    <option value="">Todos</option>
+                    {% for p in productos %}
+                    <option value="{{ p.id }}" {{ 'selected' if filtros.producto_id == p.id|string }}>
+                        {{ p.nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <span class="ctrl-label" style="font-weight:500;">Desde:</span>
+                <input type="date" name="fecha_desde" class="dash-input-sm" max="{{ today }}" value="{{ filtros.fecha_desde }}">
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <span class="ctrl-label" style="font-weight:500;">Hasta:</span>
+                <input type="date" name="fecha_hasta" class="dash-input-sm" max="{{ today }}" value="{{ filtros.fecha_hasta }}">
+            </div>
+
+            <button type="submit" class="btn-filtro-buscar">
+                <i class="bi bi-search"></i> Buscar
+            </button>
+
+            {% if filtros.cliente_id or filtros.producto_id or filtros.fecha_desde or filtros.fecha_hasta %}
+            <a href="{{ url_for('ventas.listar') }}" class="btn-filtro-clear">
+                <i class="bi bi-x-circle"></i> Limpiar
+            </a>
+            {% endif %}
         </div>
     </div>
-</div>
-{% endif %}
+</form>
 
 <!-- Tabla -->
-<div class="card border-0 shadow-sm">
-    <div class="card-body p-0">
-        <table class="table table-hover mb-0">
-            <thead class="table-warning">
-                <tr>
-                    <th>Factura #</th>
-                    <th>Cliente</th>
-                    <th>Total</th>
-                    <th>Fecha</th>
-                    <th>Productos</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for v in ventas %}
-                <tr>
-                    <td><span class="badge bg-warning text-dark">{{ v.id }}</span></td>
-                    <td>{{ v.cliente.nombre }}</td>
-                    <td class="fw-bold text-success">${{ "%.2f"|format(v.total) }}</td>
-                    <td>{{ v.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
-                    <td>
-                        {% for d in v.detalles %}
-                        <small class="badge bg-light text-dark border me-1">
-                            {{ d.producto.nombre }} x{{ d.cantidad|int if d.cantidad == d.cantidad|int else d.cantidad }}
-                        </small>
-                        {% endfor %}
-                    </td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="5" class="text-center text-muted py-4">
-                        No hay ventas que coincidan con los filtros.
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+<div class="chart-card">
+    <div class="chart-card-header">
+        <i class="bi bi-table"></i>
+        Facturas
+        <span style="font-weight:400;color:#94a894;font-size:0.78rem;margin-left:auto;">
+            {{ paginacion.total }} registro(s)
+        </span>
     </div>
-    <div class="card-footer bg-white border-0 py-3">
+
+    <div class="table-scroll">
+    <table class="dash-table">
+        <thead>
+            <tr>
+                <th>Factura</th>
+                <th>Cliente</th>
+                <th>Productos</th>
+                <th>Total</th>
+                <th>Fecha</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for v in ventas %}
+            <tr class="{{ 'row-anulada' if v.anulada }}">
+                <td data-label="Factura">
+                    <span class="factura-badge"><i class="bi bi-hash"></i>{{ v.id }}</span>
+                    {% if v.anulada %}
+                    <br><span class="badge-anulada mt-1"><i class="bi bi-x-circle-fill"></i> Anulada</span>
+                    {% endif %}
+                    {% if v.campana_id %}
+                    <br><span class="badge-campana mt-1" title="{{ v.campana.nombre if v.campana else '' }}"><i class="bi bi-calendar2-range"></i> {{ v.campana.nombre if v.campana else 'Campaña' }}</span>
+                    {% endif %}
+                </td>
+                <td data-label="Cliente" style="font-weight:600;">{{ v.cliente.nombre }}</td>
+                <td data-label="Productos">
+                    <div class="prod-list">
+                        {% for d in v.detalles %}
+                        <div class="prod-item {{ 'prod-extra' if loop.index > 2 }}">
+                            <span class="prod-name">{{ d.producto.nombre if d.producto else '(eliminado)' }}</span>
+                            <span class="prod-sep">·</span>
+                            <span class="prod-qty">{{ d.cantidad|int if d.cantidad == d.cantidad|int else d.cantidad }} × {{ d.producto.unidad_medida if d.producto else '—' }}</span>
+                        </div>
+                        {% endfor %}
+                        {% if v.detalles | length > 2 %}
+                        <button type="button" class="btn-prod-toggle" data-total="{{ v.detalles | length }}">+{{ v.detalles | length - 2 }} más</button>
+                        {% endif %}
+                    </div>
+                </td>
+                <td data-label="Total" class="total-cell" style="{{ 'color:#c62828;text-decoration:line-through;' if v.anulada }}">
+                    ${{ "{:,.2f}".format(v.total) }}
+                </td>
+                <td data-label="Fecha" class="td-sub">{{ v.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
+                <td data-label="Acciones">
+                    <div style="display:flex;gap:5px;justify-content:center;">
+                        <!-- Ver detalle -->
+                        <a href="{{ url_for('ventas.detalle', id=v.id) }}" class="btn-accion-row btn-accion-eye" title="Ver detalle"><i class="bi bi-eye"></i></a>
+                        <!-- PDF -->
+                        <a href="{{ url_for('ventas.factura_pdf', id=v.id) }}" class="btn-accion-row btn-accion-pdf" target="_blank" title="Ver factura PDF"><i class="bi bi-file-earmark-pdf"></i></a>
+                        <!-- Anular (solo si no está anulada) -->
+                        {% if not v.anulada %}
+                        <button type="button" class="btn-accion-row btn-accion-anul" title="Anular factura" onclick="abrirModalAnular({{ v.id }}, this)"><i class="bi bi-x-circle"></i></button>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6">
+                    {% set hay_filtros = filtros.cliente_id or filtros.producto_id or filtros.fecha_desde or filtros.fecha_hasta %}
+                    <div class="no-data" style="height:160px;gap:10px;">
+                        <i class="bi {{ 'bi-funnel' if hay_filtros else 'bi-receipt' }}"></i>
+                        <span style="font-weight:600;color:#3a4f3a;">
+                            {{ 'Sin ventas con esos filtros' if hay_filtros else 'No hay ventas registradas' }}
+                        </span>
+                        {% if hay_filtros %}
+                        <a href="{{ url_for('ventas.listar') }}" style="font-size:0.82rem;color:#2e7d32;text-decoration:none;border:1.5px solid #a5d6a7;border-radius:8px;padding:4px 14px;">
+                            <i class="bi bi-x-circle me-1"></i>Limpiar filtros
+                        </a>
+                        {% else %}
+                        <a href="{{ url_for('ventas.nueva') }}" style="font-size:0.82rem;color:#fff;text-decoration:none;background:#2e7d32;border-radius:8px;padding:5px 16px;font-weight:600;">
+                            <i class="bi bi-plus-lg me-1"></i>Nueva factura
+                        </a>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div><!-- /table-scroll -->
+
+    <div class="chart-card-footer">
         {{ paginar(paginacion, url_anterior, url_siguiente, 'ventas') }}
     </div>
 </div>
 
-<!-- ── MODAL REPORTE ──────────────────────────────────────────────────────── -->
+
+{% endblock %}
+
+{% block modals %}
+<!-- ── MODAL ANULAR VENTA ─────────────────────────────────────────────────────── -->
+<div class="modal fade" id="modalAnularVenta" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:420px;">
+        <div class="modal-content" style="border-radius:16px;border:none;box-shadow:0 8px 32px rgba(0,0,0,0.15);">
+            <div class="modal-body" style="padding:32px 28px 24px;">
+                <div style="text-align:center;margin-bottom:20px;">
+                    <div style="width:56px;height:56px;border-radius:50%;background:#fdecea;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+                        <i class="bi bi-x-circle" style="font-size:1.5rem;color:#c62828;"></i>
+                    </div>
+                    <h5 style="font-weight:700;color:#1a2e1a;margin-bottom:8px;">Anular factura</h5>
+                    <p style="color:#6b7c6b;font-size:0.9rem;margin:0;">
+                        ¿Estás seguro de que deseas anular la<br>
+                        <strong id="modal-anular-num" style="color:#1a2e1a;"></strong>?<br><br>
+                        <span style="font-size:0.85rem;color:#2e7d32;">
+                            <i class="bi bi-arrow-counterclockwise me-1"></i>
+                            El stock de los productos será restaurado.
+                        </span><br>
+                        <span style="font-size:0.82rem;color:#c62828;">Esta acción no se puede deshacer.</span>
+                    </p>
+                </div>
+                <div style="display:flex;gap:10px;">
+                    <button type="button" class="btn w-50" style="border-radius:10px;border:1.5px solid #d4e0d4;color:#3a4f3a;font-weight:600;font-size:0.88rem;" data-bs-dismiss="modal">Cancelar</button>
+                    <form id="form-anular" method="POST" style="width:50%;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" style="width:100%;border-radius:10px;border:none;background:#c62828;color:#fff;font-weight:700;font-size:0.88rem;padding:8px 0;cursor:pointer;">Sí, anular</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── MODAL REPORTE ─────────────────────────────────────────────────────────── -->
 <div class="modal fade" id="modalReporteVentas" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-warning text-dark">
-                <h5 class="modal-title">
-                    <i class="bi bi-file-earmark-pdf me-2"></i>Generar Reporte de Ventas
+        <div class="modal-content border-0" style="border-radius:14px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.15);">
+            <div class="modal-header" style="background:#fafcfa;border-bottom:1px solid #f0f4f0;">
+                <h5 class="modal-title fw-semibold" style="color:#1a2e1a;font-size:1rem;">
+                    <i class="bi bi-file-earmark-pdf me-2" style="color:#c62828;"></i>Generar Reporte de Ventas
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="GET" action="{{ url_for('reportes.ventas_pdf') }}" target="_blank">
-                <div class="modal-body">
-                    <p class="text-muted small mb-3">
+                <div class="modal-body px-4 py-3">
+                    <p style="color:#6b7c6b;font-size:0.85rem;margin-bottom:20px;">
                         Por defecto genera un reporte general. Personaliza los filtros si lo necesitas.
                     </p>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Cliente</label>
-                        <select name="cliente_id" class="form-select">
+                        <label class="form-label fw-semibold" style="font-size:0.85rem;color:#3a4f3a;">Cliente</label>
+                        <select name="cliente_id" class="dash-select w-100" style="padding:8px 12px;">
                             <option value="">Todos los clientes</option>
                             {% for c in clientes %}
                             <option value="{{ c.id }}">{{ c.nombre }}</option>
@@ -157,18 +556,18 @@
                     </div>
                     <div class="row g-2">
                         <div class="col-6">
-                            <label class="form-label fw-semibold">Desde</label>
-                            <input type="date" name="fecha_desde" class="form-control" max="{{ today }}">
+                            <label class="form-label fw-semibold" style="font-size:0.85rem;color:#3a4f3a;">Desde</label>
+                            <input type="date" name="fecha_desde" class="dash-input-sm w-100" style="padding:8px 12px;" max="{{ today }}">
                         </div>
                         <div class="col-6">
-                            <label class="form-label fw-semibold">Hasta</label>
-                            <input type="date" name="fecha_hasta" class="form-control" max="{{ today }}">
+                            <label class="form-label fw-semibold" style="font-size:0.85rem;color:#3a4f3a;">Hasta</label>
+                            <input type="date" name="fecha_hasta" class="dash-input-sm w-100" style="padding:8px 12px;" max="{{ today }}">
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-danger">
+                <div class="modal-footer" style="border-top:1px solid #f0f4f0;background:#fafcfa;gap:8px;">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn-pdf">
                         <i class="bi bi-file-earmark-pdf"></i> Generar PDF
                     </button>
                 </div>
@@ -176,4 +575,86 @@
         </div>
     </div>
 </div>
+
+{% endblock %}{# cierra block modals #}
+
+{% block scripts %}
+<script>
+// ── Animaciones de entrada ────────────────────────────────────────────────────
+function entrarConTransicion(el, delay) {
+    if (!el) return;
+    el.style.opacity   = '0';
+    el.style.transform = 'translateY(12px)';
+    setTimeout(function() {
+        el.style.transition = 'opacity 0.34s ease, transform 0.34s ease';
+        el.style.opacity    = '1';
+        el.style.transform  = 'translateY(0)';
+        setTimeout(function() {
+            el.style.transition = '';
+            el.style.transform  = '';
+            el.style.opacity    = '';
+        }, 370);
+    }, delay);
+}
+
+document.querySelectorAll('.kpi-card').forEach(function(card, i) {
+    entrarConTransicion(card, 40 + i * 75);
+});
+
+document.querySelectorAll('.dash-table tbody tr').forEach(function(row, i) {
+    entrarConTransicion(row, 200 + i * 45);
+});
+
+let _anularBtn = null;
+
+/* Abre modal de anulación con la URL correcta */
+function abrirModalAnular(id, btn) {
+    _anularBtn = btn || null;
+    document.getElementById('modal-anular-num').textContent = 'Factura #' + String(id).padStart(4, '0');
+    document.getElementById('form-anular').action = '/ventas/' + id + '/anular';
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalAnularVenta')).show();
+}
+
+document.getElementById('form-anular').addEventListener('submit', function(e) {
+    e.preventDefault();
+    fetch(this.action, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: new FormData(this) })
+        .then(r => r.json())
+        .then(function(data) {
+            bootstrap.Modal.getInstance(document.getElementById('modalAnularVenta')).hide();
+            mostrarToast(data.msg, data.categoria);
+            if (!data.ok || !_anularBtn) return;
+            const row = _anularBtn.closest('tr');
+            if (row) {
+                row.classList.add('row-anulada');
+                // Agregar badge de anulada al primer td
+                const tdFactura = row.querySelector('td:first-child');
+                if (tdFactura && !tdFactura.querySelector('.badge-anulada')) {
+                    const badge = document.createElement('span');
+                    badge.className = 'badge-anulada mt-1';
+                    badge.innerHTML = '<br><i class="bi bi-x-circle-fill"></i> Anulada';
+                    tdFactura.appendChild(badge);
+                }
+                // Tachar el total
+                const tdTotal = row.querySelector('.total-cell');
+                if (tdTotal) tdTotal.style.cssText = 'color:#c62828;text-decoration:line-through;';
+                // Quitar el botón de anulación
+                _anularBtn.remove();
+            }
+            _anularBtn = null;
+        });
+});
+
+document.querySelectorAll('.btn-prod-toggle').forEach(btn => {
+    btn.addEventListener('click', function () {
+        const lista  = this.closest('.prod-list');
+        const extras = lista.querySelectorAll('.prod-extra');
+        const abierto = extras[0].style.display === 'flex';
+
+        extras.forEach(el => el.style.display = abierto ? 'none' : 'flex');
+        this.textContent = abierto
+            ? `+${this.dataset.total - 2} más`
+            : 'Ocultar';
+    });
+});
+</script>
 {% endblock %}

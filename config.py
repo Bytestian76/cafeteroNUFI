@@ -1,3 +1,6 @@
+# config.py — Configuración central de Flask.
+# Lee variables de entorno desde el archivo .env (ver .env.example).
+# SECRET_KEY y DATABASE_URL son obligatorias para que la app funcione.
 import os
 from dotenv import load_dotenv
 

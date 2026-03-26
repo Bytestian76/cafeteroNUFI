@@ -1,150 +1,418 @@
 {% extends 'base.html' %}
 {% from 'paginacion.html' import paginar %}
+<!-- inventario/lista.html — Listado paginado de elementos del inventario.
+   Filtros: categoría (insumo/maquinaria/herramienta/material), mostrar inactivos, solo alertas.
+   Acciones por fila: editar, desactivar/activar, eliminar (modal de confirmación).
+   Paginación via macro paginar() de paginacion.html.
+   Alerta de escasez calculada por ElementoInventario.tiene_alerta (inventario.py). -->
 {% block title %}Inventario · El Cafetero de Nufi{% endblock %}
 
+{% block styles %}
+<style>
+    /* ── Layout ── */
+    .dash-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; }
+    .dash-title  { font-size: 1.5rem; font-weight: 700; color: #1a2e1a; margin: 0; }
+
+    /* ── KPI mini ── */
+    .kpi-card {
+        background: #fff;
+        border-radius: 14px;
+        padding: 16px 20px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        border: 1px solid #e8f0e8;
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.09); }
+    .kpi-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; flex-shrink: 0; }
+    .kpi-green { background: #e8f5e9; color: #2e7d32; }
+    .kpi-red   { background: #fce4ec; color: #c62828; }
+    .kpi-grey  { background: #f5f5f5; color: #616161; }
+    .kpi-blue  { background: #e3f2fd; color: #1565c0; }
+    .kpi-value { font-size: 1.4rem; font-weight: 800; color: #1a2e1a; line-height: 1; }
+    .kpi-label { font-size: 0.75rem; color: #6b7c6b; margin-top: 3px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
+
+    /* ── Controles de filtro ── */
+    .filter-bar {
+        background: #fff;
+        border-radius: 12px;
+        border: 1px solid #e8f0e8;
+        padding: 12px 18px;
+        box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+        margin-bottom: 20px;
+    }
+    .ctrl-label { font-size: 0.82rem; font-weight: 600; color: #3a4f3a; white-space: nowrap; }
+    .dash-select {
+        border: 1.5px solid #d4e0d4;
+        border-radius: 8px;
+        padding: 5px 10px;
+        font-size: 0.85rem;
+        color: #1b2e1b;
+        background: #fff;
+        outline: none;
+        transition: border-color 0.2s;
+        cursor: pointer;
+    }
+    .dash-select:focus { border-color: #2e7d32; box-shadow: 0 0 0 3px rgba(46,125,50,0.10); }
+    .btn-filtro-clear {
+        padding: 5px 12px;
+        border-radius: 8px;
+        border: 1.5px solid #d4e0d4;
+        background: #fff;
+        font-size: 0.82rem;
+        color: #6b7c6b;
+        cursor: pointer;
+        transition: all 0.15s;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .btn-filtro-clear:hover { background: #f5f5f5; border-color: #bbb; color: #333; }
+
+    /* ── Chart card (contenedor de tabla) ── */
+    .chart-card {
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        border: 1px solid #e8f0e8;
+        overflow: hidden;
+    }
+    .chart-card-header {
+        padding: 14px 20px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: #1a2e1a;
+        border-bottom: 1px solid #f0f4f0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #fafcfa;
+    }
+    .chart-card-header i { color: #2e7d32; font-size: 1rem; }
+    .chart-card-footer { padding: 12px 20px; border-top: 1px solid #f0f4f0; background: #fafcfa; }
+
+    /* ── Tabla ── */
+    .dash-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; min-width: 780px; }
+    .dash-table thead tr { border-bottom: 2px solid #e8f0e8; }
+    .dash-table th { padding: 10px 16px; font-size: 0.75rem; font-weight: 700; color: #6b7c6b; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; text-align: center; }
+    .dash-table th:first-child { text-align: left; }
+    .dash-table th:nth-child(2) { text-align: left; }
+    .dash-table td:nth-child(2) { max-width: 160px; overflow-wrap: break-word; word-break: break-word; white-space: normal; }
+    .dash-table tbody tr { border-bottom: 1px solid #f4f8f4; transition: background 0.12s; }
+    .dash-table tbody tr:last-child { border-bottom: none; }
+    .dash-table tbody tr:hover { background: #f8faf7; }
+    .dash-table td { padding: 11px 16px; color: #2a3d2a; vertical-align: middle; text-align: center; }
+    .dash-table td:first-child { text-align: left; }
+    .dash-table td:nth-child(2) { text-align: left; }
+    .dash-table tbody tr.row-inactivo td { color: #aaa; }
+
+    /* ── Badges de categoría ── */
+    .cat-badge {
+        display: inline-flex; align-items: center; gap: 5px;
+        border-radius: 20px; padding: 3px 10px;
+        font-size: 0.75rem; font-weight: 600;
+    }
+    .cat-insumo      { background: #e8f5e9; color: #2e7d32; }
+    .cat-maquinaria  { background: #e3f2fd; color: #1565c0; }
+    .cat-herramienta { background: #e0f2f1; color: #00695c; }
+    .cat-material    { background: #fff3e0; color: #e65100; }
+
+    /* ── Badge de estado ── */
+    .estado-badge { display: inline-flex; align-items: center; gap: 4px; border-radius: 20px; padding: 3px 10px; font-size: 0.75rem; font-weight: 600; }
+    .estado-activo   { background: #e8f5e9; color: #2e7d32; }
+    .estado-inactivo { background: #f5f5f5; color: #757575; }
+
+    /* ── Alerta de escasez ── */
+    .stock-alert-row { background: #fff8f8 !important; }
+    .stock-chip {
+        display: inline-flex; align-items: center; gap: 4px;
+        background: rgba(229,57,53,0.10);
+        border: 1px solid rgba(229,57,53,0.25);
+        border-radius: 20px; padding: 2px 8px;
+        font-size: 0.72rem; font-weight: 600; color: #c62828;
+    }
+
+    /* ── Botones de acción ── */
+    .btn-accion {
+        width: 32px; height: 32px;
+        border-radius: 8px;
+        border: 1.5px solid;
+        background: #fff;
+        cursor: pointer;
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: 0.85rem;
+        transition: all 0.15s;
+        text-decoration: none;
+    }
+    .btn-accion-edit   { border-color: #d4e0d4; color: #2e7d32; }
+    .btn-accion-edit:hover   { background: #e8f5e9; border-color: #a5d6a7; color: #1b5e20; }
+    .btn-accion-warn   { border-color: #ffe0b2; color: #e65100; }
+    .btn-accion-warn:hover   { background: #fff3e0; border-color: #ffb74d; }
+    .btn-accion-ok     { border-color: #c8e6c9; color: #2e7d32; }
+    .btn-accion-ok:hover     { background: #e8f5e9; border-color: #81c784; }
+    .btn-accion-danger { border-color: #ffcdd2; color: #c62828; }
+    .btn-accion-danger:hover { background: #fdecea; border-color: #ef9a9a; }
+
+    /* ── Botones principales ── */
+    .btn-primary-inv {
+        padding: 7px 16px;
+        border-radius: 9px;
+        border: none;
+        background: linear-gradient(135deg, #2e7d32, #388e3c);
+        color: #fff;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex; align-items: center; gap: 6px;
+        box-shadow: 0 2px 8px rgba(46,125,50,0.25);
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .btn-primary-inv:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(46,125,50,0.35); color: #fff; }
+    .btn-pdf {
+        padding: 7px 16px;
+        border-radius: 9px;
+        border: 1.5px solid #ffcdd2;
+        background: #fff;
+        color: #c62828;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex; align-items: center; gap: 6px;
+        transition: all 0.15s;
+    }
+    .btn-pdf:hover { background: #fdecea; border-color: #ef9a9a; color: #b71c1c; }
+
+    /* ── Sin datos ── */
+    .no-data { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 140px; color: #94a894; font-size: 0.88rem; gap: 8px; }
+    .no-data i { font-size: 2rem; opacity: 0.4; }
+
+    /* ── Pulse en filas con alerta de escasez ── */
+    @keyframes stockRowPulse {
+        0%, 100% { background: #fff8f8 !important; }
+        50%       { background: #fce8e8 !important; }
+    }
+    .stock-alert-row { animation: stockRowPulse 2.6s ease-in-out infinite; }
+
+    /* ── Switch personalizado ── */
+    .dash-switch { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+    .dash-switch input[type=checkbox] { width: 36px; height: 20px; cursor: pointer; accent-color: #2e7d32; }
+    .dash-switch span { font-size: 0.82rem; font-weight: 600; color: #3a4f3a; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h3 class="fw-bold"><i class="bi bi-box-seam"></i> Inventario</h3>
+
+<!-- Header -->
+<div class="dash-header">
+    <div>
+        <h4 class="dash-title"><i class="bi bi-box-seam me-2" style="color:#2e7d32"></i>Inventario</h4>
+        <span style="font-size:0.82rem;color:#6b7c6b;">Gestión de elementos del inventario</span>
+    </div>
     <div class="d-flex gap-2">
-        <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#modalReporteInventario">
-            <i class="bi bi-file-earmark-pdf"></i> Generar Reporte PDF
+        <button class="btn-pdf" data-bs-toggle="modal" data-bs-target="#modalReporteInventario">
+            <i class="bi bi-file-earmark-pdf"></i> Reporte PDF
         </button>
-        <a href="{{ url_for('inventario.nuevo') }}" class="btn btn-success">
+        <a href="{{ url_for('inventario.nuevo') }}" class="btn-primary-inv">
             <i class="bi bi-plus-lg"></i> Nuevo Elemento
         </a>
     </div>
 </div>
 
-<!-- Filtros -->
-<form method="GET" class="mb-4">
-    <div class="row g-2 align-items-center">
-        <div class="col-auto">
-            <label class="col-form-label fw-semibold">Categoría:</label>
-        </div>
-        <div class="col-auto">
-            <select name="categoria" class="form-select" onchange="this.form.submit()">
-                <option value="">Todas</option>
-                <option value="insumo"      {{ 'selected' if categoria=='insumo' }}>Insumo</option>
-                <option value="maquinaria"  {{ 'selected' if categoria=='maquinaria' }}>Maquinaria</option>
-                <option value="herramienta" {{ 'selected' if categoria=='herramienta' }}>Herramienta</option>
-            </select>
-        </div>
-        <div class="col-auto">
-            <div class="form-check form-switch ms-2">
-                <input class="form-check-input" type="checkbox" name="inactivos" value="1"
-                    id="chkInactivos" onchange="this.form.submit()"
-                    {{ 'checked' if mostrar_inactivos }}>
-                <label class="form-check-label fw-semibold" for="chkInactivos">
-                    Mostrar inactivos
-                </label>
+<!-- Mini KPIs -->
+{% set total_alertas = elementos | selectattr('activo') | selectattr('tiene_alerta') | list | length %}
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card">
+            <div class="kpi-icon kpi-green"><i class="bi bi-box-seam"></i></div>
+            <div>
+                <div class="kpi-value">{{ paginacion.total }}</div>
+                <div class="kpi-label">Total elementos</div>
             </div>
         </div>
-        {% if categoria %}
-        <div class="col-auto">
-            <a href="{{ url_for('inventario.listar') }}" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-x"></i> Limpiar
-            </a>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card">
+            <div class="kpi-icon kpi-red"><i class="bi bi-exclamation-triangle"></i></div>
+            <div>
+                <div class="kpi-value">{{ total_alertas }}</div>
+                <div class="kpi-label">Con alerta de escasez</div>
+            </div>
         </div>
-        {% endif %}
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card">
+            <div class="kpi-icon kpi-grey"><i class="bi bi-slash-circle"></i></div>
+            <div>
+                <div class="kpi-value">{{ total_inactivos }}</div>
+                <div class="kpi-label">Total inactivos</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card">
+            <div class="kpi-icon kpi-blue"><i class="bi bi-filter"></i></div>
+            <div>
+                <div class="kpi-value">{{ categoria if categoria else 'Todas' }}</div>
+                <div class="kpi-label">Categoría activa</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros -->
+<form method="GET" id="formFiltros">
+    <div class="filter-bar">
+        <div class="d-flex align-items-center gap-3 flex-wrap">
+            <span class="ctrl-label"><i class="bi bi-funnel me-1"></i>Filtros</span>
+
+            <div class="d-flex align-items-center gap-2">
+                <span class="ctrl-label" style="font-weight:500;">Categoría:</span>
+                <select name="categoria" class="dash-select" onchange="this.form.submit()">
+                    <option value="">Todas</option>
+                    <option value="insumo"      {{ 'selected' if categoria=='insumo' }}>Insumo</option>
+                    <option value="maquinaria"  {{ 'selected' if categoria=='maquinaria' }}>Maquinaria</option>
+                    <option value="herramienta" {{ 'selected' if categoria=='herramienta' }}>Herramienta</option>
+                    <option value="material"    {{ 'selected' if categoria=='material' }}>Material</option>
+                </select>
+            </div>
+
+            <label class="dash-switch">
+                <input type="checkbox" name="inactivos" value="1" id="chkInactivos" onchange="this.form.submit()" {{ 'checked' if mostrar_inactivos }}>
+                <span>Mostrar inactivos</span>
+            </label>
+
+            {% if categoria %}
+            <a href="{{ url_for('inventario.listar') }}" class="btn-filtro-clear">
+                <i class="bi bi-x-circle"></i> Limpiar filtros
+            </a>
+            {% endif %}
+        </div>
     </div>
 </form>
 
 <!-- Tabla -->
-<div class="card border-0 shadow-sm">
-    <div class="card-body p-0">
-        <table class="table table-hover mb-0">
-            <thead class="table-success">
-                <tr>
-                    <th>#</th>
-                    <th>Nombre</th>
-                    <th>Categoría</th>
-                    <th>Stock Actual</th>
-                    <th>Stock Mínimo</th>
-                    <th>Unidad</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for e in elementos %}
-                <tr class="{{ 'table-secondary text-muted' if not e.activo }}">
-                    <td>{{ e.id }}</td>
-                    <td>
-                        {{ e.nombre }}
-                        {% if e.activo and e.tiene_alerta() %}
-                        <span class="badge bg-danger ms-1">
-                            <i class="bi bi-exclamation-triangle"></i> Escasez
-                        </span>
-                        {% endif %}
-                    </td>
-                    <td><span class="badge bg-secondary">{{ e.categoria }}</span></td>
-                    <td class="{{ 'text-danger fw-bold' if e.activo and e.tiene_alerta() }}">
-                        {{ e.stock_actual }} {{ e.unidad_medida }}
-                    </td>
-                    <td>{{ e.stock_minimo }} {{ e.unidad_medida }}</td>
-                    <td>{{ e.unidad_medida }}</td>
-                    <td>
-                        {% if e.activo %}
-                            <span class="badge bg-success">Activo</span>
-                        {% else %}
-                            <span class="badge bg-secondary">Inactivo</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        <a href="{{ url_for('inventario.editar', id=e.id) }}"
-                           class="btn btn-sm btn-outline-primary" title="Editar">
-                            <i class="bi bi-pencil"></i>
-                        </a>
-
-                        {% if e.activo %}
-                        <button type="button" class="btn btn-sm btn-outline-warning"
-                            data-id="{{ e.id }}" data-nombre="{{ e.nombre }}" data-accion="desactivar"
-                            onclick="confirmarEstado(this)" title="Desactivar">
-                            <i class="bi bi-slash-circle"></i>
-                        </button>
-                        {% else %}
-                        <button type="button" class="btn btn-sm btn-outline-success"
-                            data-id="{{ e.id }}" data-nombre="{{ e.nombre }}" data-accion="activar"
-                            onclick="confirmarEstado(this)" title="Activar">
-                            <i class="bi bi-check-circle"></i>
-                        </button>
-                        {% endif %}
-
-                        <button type="button" class="btn btn-sm btn-outline-danger"
-                            data-id="{{ e.id }}" data-nombre="{{ e.nombre }}"
-                            onclick="confirmarEliminar(this)" title="Eliminar permanentemente">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="8" class="text-center text-muted py-4">
-                        No hay elementos en el inventario.
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+<div class="chart-card">
+    <div class="chart-card-header">
+        <i class="bi bi-table"></i>
+        Elementos
+        <span style="font-weight:400;color:#94a894;font-size:0.78rem;margin-left:auto;">
+            {{ paginacion.total }} registro(s)
+        </span>
     </div>
-    <div class="card-footer bg-white border-0 py-3">
+
+    <div class="table-scroll">
+    <table class="dash-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Nombre</th>
+                <th>Categoría</th>
+                <th>Stock</th>
+                <th>Stock Actual</th>
+                <th>Stock Mínimo</th>
+                <th>Presentación</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for e in elementos %}
+            <tr class="{{ 'row-inactivo' if not e.activo }} {{ 'stock-alert-row' if e.activo and e.tiene_alerta }}">
+                <td class="td-muted">#{{ e.id }}</td>
+                <td>
+                    <span style="font-weight:600;">{{ e.nombre }}</span>
+                </td>
+                <td>
+                    {% if e.categoria == 'insumo' %}
+                        <span class="cat-badge cat-insumo"><i class="bi bi-droplet-fill"></i> Insumo</span>
+                    {% elif e.categoria == 'maquinaria' %}
+                        <span class="cat-badge cat-maquinaria"><i class="bi bi-gear-fill"></i> Maquinaria</span>
+                    {% elif e.categoria == 'herramienta' %}
+                        <span class="cat-badge cat-herramienta"><i class="bi bi-tools"></i> Herramienta</span>
+                    {% else %}
+                        <span class="cat-badge cat-material"><i class="bi bi-layers-fill"></i> Material</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if not e.activo %}
+                        <span class="estado-badge estado-inactivo"><i class="bi bi-dash-circle"></i> N/A</span>
+                    {% elif e.tiene_alerta %}
+                        <span class="stock-chip"><i class="bi bi-exclamation-triangle-fill"></i> Escasez</span>
+                    {% else %}
+                        <span class="estado-badge estado-activo"><i class="bi bi-check-circle-fill"></i> Normal</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if e.activo and e.tiene_alerta %}
+                        <span style="color:#c62828;font-weight:700;">{{ e.stock_actual }}</span>
+                    {% else %}
+                        <span style="font-weight:600;">{{ e.stock_actual }}</span>
+                    {% endif %}
+                </td>
+                <td class="td-sub">{{ e.stock_minimo }}</td>
+                <td class="td-sub">{{ e.unidad_medida }}</td>
+                <td>
+                    {% if e.activo %}
+                        <span class="estado-badge estado-activo"><i class="bi bi-check-circle-fill"></i> Activo</span>
+                    {% else %}
+                        <span class="estado-badge estado-inactivo"><i class="bi bi-slash-circle"></i> Inactivo</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="d-flex gap-1 justify-content-center">
+                        <a href="{{ url_for('inventario.editar', id=e.id) }}" class="btn-accion btn-accion-edit" title="Editar"><i class="bi bi-pencil"></i></a>
+
+                        {% if e.activo %}
+                        <button type="button" class="btn-accion btn-accion-warn" data-id="{{ e.id }}" data-nombre="{{ e.nombre }}" data-accion="desactivar" onclick="confirmarEstado(this)" title="Desactivar"><i class="bi bi-slash-circle"></i></button>
+                        {% else %}
+                        <button type="button" class="btn-accion btn-accion-ok" data-id="{{ e.id }}" data-nombre="{{ e.nombre }}" data-accion="activar" onclick="confirmarEstado(this)" title="Activar"><i class="bi bi-check-circle"></i></button>
+                        {% endif %}
+
+                        <button type="button" class="btn-accion btn-accion-danger" data-id="{{ e.id }}" data-nombre="{{ e.nombre }}" onclick="confirmarEliminar(this)" title="Eliminar"><i class="bi bi-trash"></i></button>
+                    </div>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="9">
+                    <div class="no-data">
+                        <i class="bi bi-box-seam"></i>
+                        <span>No hay elementos en el inventario</span>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div><!-- /table-scroll -->
+
+    <div class="chart-card-footer">
         {{ paginar(paginacion, url_anterior, url_siguiente, 'elementos') }}
     </div>
 </div>
 
-<!-- ── MODAL ACTIVAR / DESACTIVAR ────────────────────────────────────────── -->
+
+{% endblock %}
+
+{% block modals %}
+<!-- ── MODAL ACTIVAR / DESACTIVAR ──────────────────────────────────────────── -->
 <div class="modal fade" id="modalEstado" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-sm">
-        <div class="modal-content border-0 shadow">
+        <div class="modal-content border-0" style="border-radius:14px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.15);">
             <div class="modal-header text-white" id="modalEstadoHeader">
-                <h6 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Confirmar acción</h6>
+                <h6 class="modal-title fw-semibold"><i class="bi bi-exclamation-triangle me-2"></i>Confirmar acción</h6>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body text-center py-3">
-                <p class="mb-1" id="modalEstadoTexto"></p>
-                <p class="fw-bold mb-0" id="modalEstadoNombre"></p>
+            <div class="modal-body text-center py-4">
+                <p class="mb-1" id="modalEstadoTexto" style="color:#6b7c6b;font-size:0.88rem;"></p>
+                <p class="fw-bold mb-0" style="color:#1a2e1a;" id="modalEstadoNombre"></p>
             </div>
-            <div class="modal-footer justify-content-center border-0 pt-0">
+            <div class="modal-footer justify-content-center border-0 pt-0 pb-4 gap-2">
                 <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
                 <form id="formEstado" method="POST" class="d-inline">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -155,20 +423,20 @@
     </div>
 </div>
 
-<!-- ── MODAL ELIMINAR ────────────────────────────────────────────────────── -->
+<!-- ── MODAL ELIMINAR ───────────────────────────────────────────────────────── -->
 <div class="modal fade" id="modalEliminar" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-sm">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-danger text-white">
-                <h6 class="modal-title"><i class="bi bi-trash me-2"></i>Eliminar permanentemente</h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        <div class="modal-content border-0" style="border-radius:14px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.15);">
+            <div class="modal-header" style="background:#fdecea;border-bottom:1px solid #ffcdd2;">
+                <h6 class="modal-title fw-semibold" style="color:#c62828;"><i class="bi bi-trash me-2"></i>Eliminar permanentemente</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body text-center py-3">
-                <p class="mb-1">¿Eliminar definitivamente el elemento</p>
-                <p class="fw-bold mb-2" id="modalEliminarNombre"></p>
-                <small class="text-danger">Esta acción no se puede deshacer.</small>
+            <div class="modal-body text-center py-4">
+                <p class="mb-1" style="color:#6b7c6b;font-size:0.88rem;">¿Eliminar definitivamente el elemento</p>
+                <p class="fw-bold mb-2" style="color:#1a2e1a;" id="modalEliminarNombre"></p>
+                <small style="color:#c62828;font-size:0.78rem;"><i class="bi bi-exclamation-triangle-fill me-1"></i>Esta acción no se puede deshacer.</small>
             </div>
-            <div class="modal-footer justify-content-center border-0 pt-0">
+            <div class="modal-footer justify-content-center border-0 pt-0 pb-4 gap-2">
                 <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
                 <form id="formEliminar" method="POST" class="d-inline">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -179,41 +447,42 @@
     </div>
 </div>
 
-<!-- ── MODAL REPORTE ──────────────────────────────────────────────────────── -->
+<!-- ── MODAL REPORTE ─────────────────────────────────────────────────────────── -->
 <div class="modal fade" id="modalReporteInventario" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-success text-white">
-                <h5 class="modal-title">
-                    <i class="bi bi-file-earmark-pdf me-2"></i>Generar Reporte de Inventario
+        <div class="modal-content border-0" style="border-radius:14px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.15);">
+            <div class="modal-header" style="background:#fafcfa;border-bottom:1px solid #f0f4f0;">
+                <h5 class="modal-title fw-semibold" style="color:#1a2e1a;font-size:1rem;">
+                    <i class="bi bi-file-earmark-pdf me-2" style="color:#c62828;"></i>Generar Reporte de Inventario
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="GET" action="{{ url_for('reportes.inventario_pdf') }}" target="_blank">
-                <div class="modal-body">
-                    <p class="text-muted small mb-3">
+                <div class="modal-body px-4 py-3">
+                    <p style="color:#6b7c6b;font-size:0.85rem;margin-bottom:20px;">
                         Por defecto genera un reporte general. Personaliza los filtros si lo necesitas.
                     </p>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Categoría</label>
-                        <select name="categoria" class="form-select">
+                        <label class="form-label fw-semibold" style="font-size:0.85rem;color:#3a4f3a;">Categoría</label>
+                        <select name="categoria" class="dash-select w-100" style="padding:8px 12px;">
                             <option value="">Todas las categorías</option>
                             <option value="insumo">Insumo</option>
                             <option value="maquinaria">Maquinaria</option>
                             <option value="herramienta">Herramienta</option>
+                            <option value="material">Material</option>
                         </select>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Estado de stock</label>
-                        <select name="alerta" class="form-select">
+                    <div class="mb-1">
+                        <label class="form-label fw-semibold" style="font-size:0.85rem;color:#3a4f3a;">Estado de stock</label>
+                        <select name="alerta" class="dash-select w-100" style="padding:8px 12px;">
                             <option value="">Todos los elementos</option>
                             <option value="1">Solo elementos con alerta de escasez</option>
                         </select>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-danger">
+                <div class="modal-footer" style="border-top:1px solid #f0f4f0;background:#fafcfa;gap:8px;">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn-pdf">
                         <i class="bi bi-file-earmark-pdf"></i> Generar PDF
                     </button>
                 </div>
@@ -221,31 +490,139 @@
         </div>
     </div>
 </div>
-{% endblock %}
+
+{% endblock %}{# cierra block modals #}
 
 {% block scripts %}
 <script>
+// ── Animaciones de entrada ────────────────────────────────────────────────────
+function entrarConTransicion(el, delay) {
+    if (!el) return;
+    el.style.opacity   = '0';
+    el.style.transform = 'translateY(12px)';
+    setTimeout(function() {
+        el.style.transition = 'opacity 0.34s ease, transform 0.34s ease';
+        el.style.opacity    = '1';
+        el.style.transform  = 'translateY(0)';
+        setTimeout(function() {
+            el.style.transition = '';
+            el.style.transform  = '';
+            el.style.opacity    = '';
+        }, 370);
+    }, delay);
+}
+
+document.querySelectorAll('.kpi-card').forEach(function(card, i) {
+    entrarConTransicion(card, 40 + i * 75);
+});
+
+document.querySelectorAll('.dash-table tbody tr').forEach(function(row, i) {
+    entrarConTransicion(row, 180 + i * 40);
+});
+
+let _estadoBtn = null;
+let _eliminarBtn = null;
+
 function confirmarEstado(btn) {
-    const id     = btn.dataset.id;
-    const nombre = btn.dataset.nombre;
-    const accion = btn.dataset.accion;
-    const esDesactivar = accion === 'desactivar';
-    document.getElementById('modalEstadoHeader').className =
-        'modal-header text-white ' + (esDesactivar ? 'bg-warning' : 'bg-success');
+    _estadoBtn = btn;
+    const id       = btn.dataset.id;
+    const nombre   = btn.dataset.nombre;
+    const accion   = btn.dataset.accion;
+    const esDesact = accion === 'desactivar';
+
+    document.getElementById('modalEstadoHeader').style.cssText =
+        'background:' + (esDesact ? '#fff3e0;border-bottom:1px solid #ffe0b2;' : '#e8f5e9;border-bottom:1px solid #c8e6c9;');
+    document.getElementById('modalEstadoHeader').querySelector('.modal-title').style.color =
+        esDesact ? '#e65100' : '#2e7d32';
     document.getElementById('modalEstadoTexto').textContent =
-        '¿' + (esDesactivar ? 'Desactivar' : 'Activar') + ' el elemento';
+        '¿' + (esDesact ? 'Desactivar' : 'Activar') + ' el elemento';
     document.getElementById('modalEstadoNombre').textContent = nombre + '?';
     document.getElementById('formEstado').action = '/inventario/' + accion + '/' + id;
+
     const btnC = document.getElementById('btnEstado');
-    btnC.className = 'btn btn-sm ' + (esDesactivar ? 'btn-warning' : 'btn-success');
-    btnC.textContent = esDesactivar ? 'Sí, desactivar' : 'Sí, activar';
-    new bootstrap.Modal(document.getElementById('modalEstado')).show();
+    btnC.className = 'btn btn-sm ' + (esDesact ? 'btn-warning' : 'btn-success');
+    btnC.textContent = esDesact ? 'Sí, desactivar' : 'Sí, activar';
+
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEstado')).show();
 }
 
 function confirmarEliminar(btn) {
+    _eliminarBtn = btn;
     document.getElementById('modalEliminarNombre').textContent = btn.dataset.nombre + '?';
     document.getElementById('formEliminar').action = '/inventario/eliminar/' + btn.dataset.id;
-    new bootstrap.Modal(document.getElementById('modalEliminar')).show();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEliminar')).show();
 }
+
+/* ── AJAX: activar/desactivar ── */
+document.getElementById('formEstado').addEventListener('submit', function(e) {
+    e.preventDefault();
+    fetch(this.action, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: new FormData(this) })
+        .then(r => r.json())
+        .then(function(data) {
+            bootstrap.Modal.getInstance(document.getElementById('modalEstado')).hide();
+            mostrarToast(data.msg, data.categoria);
+            if (!data.ok || !_estadoBtn) return;
+            const accion = _estadoBtn.dataset.accion;
+            const row    = _estadoBtn.closest('tr');
+            const tds    = row.querySelectorAll('td');
+            const esDesact = accion === 'desactivar';
+
+            // Row classes
+            if (esDesact) {
+                row.classList.add('row-inactivo');
+                row.classList.remove('stock-alert-row');
+                row.style.animation = 'none';
+            } else {
+                row.classList.remove('row-inactivo');
+            }
+
+            // Celda Stock (índice 3)
+            if (esDesact) {
+                tds[3].innerHTML = '<span class="estado-badge estado-inactivo"><i class="bi bi-dash-circle"></i> N/A</span>';
+            } else if (data.tiene_alerta) {
+                tds[3].innerHTML = '<span class="stock-chip"><i class="bi bi-exclamation-triangle-fill"></i> Escasez</span>';
+                row.classList.add('stock-alert-row');
+            } else {
+                tds[3].innerHTML = '<span class="estado-badge estado-activo"><i class="bi bi-check-circle-fill"></i> Normal</span>';
+            }
+
+            // Celda Estado (índice 7)
+            tds[7].innerHTML = esDesact
+                ? '<span class="estado-badge estado-inactivo"><i class="bi bi-slash-circle"></i> Inactivo</span>'
+                : '<span class="estado-badge estado-activo"><i class="bi bi-check-circle-fill"></i> Activo</span>';
+
+            // Reemplazar botón
+            const id     = _estadoBtn.dataset.id;
+            const nombre = _estadoBtn.dataset.nombre;
+            const nuevoBtn = document.createElement('button');
+            nuevoBtn.type = 'button';
+            nuevoBtn.title = esDesact ? 'Activar' : 'Desactivar';
+            nuevoBtn.dataset.id     = id;
+            nuevoBtn.dataset.nombre = nombre;
+            nuevoBtn.dataset.accion = esDesact ? 'activar' : 'desactivar';
+            nuevoBtn.className = 'btn-accion ' + (esDesact ? 'btn-accion-ok' : 'btn-accion-warn');
+            nuevoBtn.innerHTML = esDesact ? '<i class="bi bi-check-circle"></i>' : '<i class="bi bi-slash-circle"></i>';
+            nuevoBtn.setAttribute('onclick', 'confirmarEstado(this)');
+            _estadoBtn.replaceWith(nuevoBtn);
+            _estadoBtn = null;
+        });
+});
+
+/* ── AJAX: eliminar ── */
+document.getElementById('formEliminar').addEventListener('submit', function(e) {
+    e.preventDefault();
+    fetch(this.action, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: new FormData(this) })
+        .then(r => r.json())
+        .then(function(data) {
+            bootstrap.Modal.getInstance(document.getElementById('modalEliminar')).hide();
+            mostrarToast(data.msg, data.categoria);
+            if (!data.ok || !_eliminarBtn) return;
+            const row = _eliminarBtn.closest('tr');
+            row.style.transition = 'opacity 0.4s ease';
+            row.style.opacity = '0';
+            setTimeout(function() { row.remove(); }, 420);
+            _eliminarBtn = null;
+        });
+});
 </script>
 {% endblock %}

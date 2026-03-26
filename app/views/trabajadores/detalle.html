@@ -1,0 +1,268 @@
+{% extends 'base.html' %}
+<!-- trabajadores/detalle.html — Historial de jornales de un trabajador.
+     Controlador: trabajador_controller.py línea 88 -->
+{% block title %}{{ trabajador.nombre }} · El Cafetero de Nufi{% endblock %}
+
+{% block styles %}
+<style>
+    .page-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 28px; }
+    .btn-back { width:36px;height:36px;border-radius:10px;flex-shrink:0;margin-top:3px; border:1.5px solid #d4e0d4;background:#fff;color:#2e7d32; display:inline-flex;align-items:center;justify-content:center; font-size:1rem;text-decoration:none;transition:all 0.15s; }
+    .btn-back:hover { background:#e8f5e9;border-color:#a5d6a7;color:#1b5e20; }
+    .page-title { font-size:1.3rem;font-weight:700;color:#1a2e1a;margin:0; }
+
+    .kpi-row { display:flex;gap:14px;margin-bottom:24px;flex-wrap:wrap; }
+    .kpi-card { background:#fff;border-radius:13px;border:1px solid #e8f0e8;padding:16px 20px;box-shadow:0 2px 8px rgba(0,0,0,0.04);flex:1;min-width:140px; }
+    .kpi-label { font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6b7c6b;margin-bottom:6px; }
+    .kpi-value { font-size:1.35rem;font-weight:800;color:#1a2e1a; }
+
+    /* Filtro */
+    .filter-card { background:#fff;border-radius:13px;border:1px solid #e8f0e8;padding:14px 18px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,0.04); }
+    .filter-row  { display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end; }
+    .filter-group { display:flex;flex-direction:column;gap:4px; }
+    .filter-group label { font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#6b7c6b; }
+    .filter-group select,
+    .filter-group input[type=date] { height:36px;border-radius:9px;border:1.5px solid #d4e0d4;padding:0 10px;font-size:0.86rem;color:#1a2e1a;background:#fff;outline:none; }
+    .filter-group select:focus,
+    .filter-group input[type=date]:focus { border-color:#66bb6a; }
+    .btn-filtrar { height:36px;padding:0 16px;border-radius:9px;background:#2e7d32;color:#fff;border:none;font-size:0.86rem;font-weight:600;cursor:pointer;transition:background 0.15s; }
+    .btn-filtrar:hover { background:#1b5e20; }
+    .btn-limpiar { height:36px;padding:0 14px;border-radius:9px;border:1.5px solid #d4e0d4;background:#fff;color:#2e7d32;font-size:0.86rem;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;transition:all 0.15s; }
+    .btn-limpiar:hover { background:#e8f5e9; }
+    .filtro-activo-badge { font-size:0.75rem;background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;border-radius:20px;padding:2px 10px;font-weight:600;margin-left:8px; }
+
+    .section-card { background:#fff;border-radius:14px;border:1px solid #e8f0e8;overflow:hidden;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,0.04); }
+    .section-header { padding:13px 20px;border-bottom:1px solid #f0f4f0;background:#fafcfa;font-size:0.85rem;font-weight:600;color:#3a4f3a;display:flex;align-items:center;gap:8px; }
+    .section-header i { color:#2e7d32; }
+
+    /* Tabla */
+    .det-table { width:100%;border-collapse:collapse; }
+    .det-table th { font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6b7c6b;padding:10px 16px;border-bottom:1px solid #f0f4f0;white-space:nowrap;text-align:center; }
+    .det-table td { padding:11px 16px;border-bottom:1px solid #f7faf7;font-size:0.86rem;vertical-align:middle;text-align:center; }
+    .det-table tr:last-child td { border-bottom:none; }
+    .det-table tr:hover td { background:#fafcfa; }
+
+    /* Fila de grupo (nombre temporada) */
+    .tr-grupo td { background:#f0f7f0;font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#2e7d32;padding:8px 16px;border-top:2px solid #e0ede0;border-bottom:1px solid #e0ede0; }
+
+    /* Fila de subtotal */
+    .tr-subtotal td { background:#e8f5e9;font-weight:700;font-size:0.86rem;color:#1b5e20;padding:9px 16px;border-top:1px solid #c8e6c9;border-bottom:2px solid #c8e6c9; }
+
+    .btn-editar { padding:7px 14px;border-radius:9px;border:1.5px solid #d4e0d4;background:#fff;color:#2e7d32;font-size:0.85rem;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all 0.15s; }
+    .btn-editar:hover { background:#e8f5e9;border-color:#a5d6a7;color:#1b5e20; }
+    .btn-eliminar { padding:5px 10px;border-radius:7px;border:1.5px solid #ffcdd2;background:#fff;color:#c62828;font-size:0.78rem;cursor:pointer;transition:all 0.15s; }
+    .btn-eliminar:hover { background:#fdecea; }
+
+    .badge-activo   { background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;padding:3px 10px;border-radius:20px;font-size:0.78rem;font-weight:600; }
+    .badge-inactivo { background:#f3f3f3;color:#6b7c6b;border:1px solid #d4d4d4;padding:3px 10px;border-radius:20px;font-size:0.78rem;font-weight:600; }
+    .empty-mini { text-align:center;padding:28px;color:#94a894;font-size:0.85rem; }
+    .td-sub { color:#6b7c6b; }
+
+    .page-header  { animation: detIn 0.3s ease both; }
+    .kpi-row      { animation: detIn 0.35s ease 0.05s both; }
+    .filter-card  { animation: detIn 0.38s ease 0.06s both; }
+    .section-card { animation: detIn 0.4s ease 0.08s both; }
+    @keyframes detIn { from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);} }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb-nav">
+    <a href="{{ url_for('trabajadores.hub_operaciones') }}">Operaciones</a>
+    <span class="bc-sep">›</span>
+    <a href="{{ url_for('trabajadores.listar') }}">Trabajadores</a>
+    <span class="bc-sep">›</span>
+    <span class="bc-current">{{ trabajador.nombre }}</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <a href="{{ url_for('trabajadores.listar') }}" class="btn-back"><i class="bi bi-arrow-left"></i></a>
+    <div style="flex:1;">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <h4 class="page-title">{{ trabajador.nombre }}</h4>
+            {% if trabajador.activo %}
+            <span class="badge-activo">Activo</span>
+            {% else %}
+            <span class="badge-inactivo">Inactivo</span>
+            {% endif %}
+        </div>
+        <span style="font-size:0.82rem;color:#6b7c6b;">
+            {% if trabajador.documento %}Cédula: {{ trabajador.documento }} &nbsp;·&nbsp;{% endif %}
+            {% if trabajador.telefono %}Tel: {{ trabajador.telefono }}{% endif %}
+        </span>
+    </div>
+    <a href="{{ url_for('trabajadores.editar', id=trabajador.id) }}" class="btn-editar">
+        <i class="bi bi-pencil"></i> Editar
+    </a>
+</div>
+
+<!-- KPIs -->
+<div class="kpi-row">
+    <div class="kpi-card">
+        <div class="kpi-label"><i class="bi bi-calendar-check me-1"></i>Total jornales</div>
+        <div class="kpi-value">{{ jornales|length }}</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label"><i class="bi bi-cash-coin me-1"></i>Total pagado</div>
+        <div class="kpi-value" style="color:#2e7d32;">${{ '{:,.2f}'.format(total_pagado) }}</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label"><i class="bi bi-calendar2-range me-1"></i>Temporadas</div>
+        <div class="kpi-value">{{ grupos|length }}</div>
+    </div>
+</div>
+
+<!-- Filtros -->
+{% set hay_filtro = filtros.temporada_id or filtros.fecha_desde or filtros.fecha_hasta %}
+<div class="filter-card">
+    <form method="GET" action="{{ url_for('trabajadores.detalle', id=trabajador.id) }}">
+        <div class="filter-row">
+            {% if temporadas %}
+            <div class="filter-group">
+                <label>Temporada</label>
+                <select name="temporada_id">
+                    <option value="">Todas</option>
+                    {% for t in temporadas %}
+                    <option value="{{ t.id }}" {% if filtros.temporada_id == t.id %}selected{% endif %}>
+                        {{ t.nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            <div class="filter-group">
+                <label>Desde</label>
+                <input type="date" name="fecha_desde" value="{{ filtros.fecha_desde or '' }}">
+            </div>
+            <div class="filter-group">
+                <label>Hasta</label>
+                <input type="date" name="fecha_hasta" value="{{ filtros.fecha_hasta or '' }}">
+            </div>
+            <button type="submit" class="btn-filtrar"><i class="bi bi-funnel me-1"></i>Filtrar</button>
+            {% if hay_filtro %}
+            <a href="{{ url_for('trabajadores.detalle', id=trabajador.id) }}" class="btn-limpiar">
+                <i class="bi bi-x me-1"></i>Limpiar
+            </a>
+            {% endif %}
+        </div>
+    </form>
+</div>
+
+<!-- Historial de jornales agrupado por temporada -->
+<div class="section-card">
+    <div class="section-header">
+        <i class="bi bi-clock-history"></i> Historial de jornales
+        {% if hay_filtro %}<span class="filtro-activo-badge">Filtro activo</span>{% endif %}
+        <span style="margin-left:auto;font-weight:400;color:#94a894;">{{ jornales|length }} registros</span>
+    </div>
+    {% if grupos %}
+    <div class="table-scroll">
+        <table class="det-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Temporada</th>
+                    <th>Jornales</th>
+                    <th>Valor/Jornal</th>
+                    <th>Total</th>
+                    <th>Observación</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for grupo in grupos %}
+                <!-- Encabezado de grupo -->
+                <tr class="tr-grupo">
+                    <td colspan="7">
+                        <i class="bi bi-calendar3 me-1"></i>{{ grupo.temporada.nombre }}
+                        &nbsp;·&nbsp;
+                        {{ grupo.jornales|length }} jornal{{ 'es' if grupo.jornales|length != 1 }}
+                    </td>
+                </tr>
+                {% for j in grupo.jornales %}
+                <tr>
+                    <td class="td-sub" style="white-space:nowrap;">{{ j.fecha.strftime('%d/%m/%Y') }}</td>
+                    <td style="font-weight:500;">{{ j.campana.nombre }}</td>
+                    <td>{{ j.cantidad_jornales|float }}</td>
+                    <td class="td-sub">${{ '{:,.2f}'.format(j.valor_jornal) }}</td>
+                    <td style="font-weight:700;color:#2e7d32;">${{ '{:,.2f}'.format(j.total) }}</td>
+                    <td class="td-sub">{{ j.observacion or '—' }}</td>
+                    <td>
+                        <button type="button"
+                                class="btn-eliminar btn-eliminar-jornal"
+                                data-action="{{ url_for('trabajadores.eliminar_jornal', id=j.id) }}"
+                                data-fecha="{{ j.fecha.strftime('%d/%m/%Y') }}">
+                            <i class="bi bi-trash3"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+                <!-- Subtotal de temporada -->
+                <tr class="tr-subtotal">
+                    <td colspan="4">Subtotal {{ grupo.temporada.nombre }}</td>
+                    <td>${{ '{:,.2f}'.format(grupo.subtotal) }}</td>
+                    <td colspan="2"></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-mini">
+        {% if hay_filtro %}
+        No hay jornales con los filtros aplicados.
+        {% else %}
+        Este trabajador no tiene jornales registrados.
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- Form oculto para eliminar jornal -->
+<form method="POST" id="formEliminarJornal" action="">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
+
+<script>
+document.querySelectorAll('.btn-eliminar-jornal').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.getElementById('formEliminarJornal').action = btn.dataset.action;
+        document.getElementById('jornal-fecha-modal').textContent = btn.dataset.fecha;
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEliminarJornal')).show();
+    });
+});
+</script>
+{% endblock %}
+
+{% block modals %}
+<div class="modal fade" id="modalEliminarJornal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:400px;">
+        <div class="modal-content border-0" style="border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.15);">
+            <div class="modal-header border-0 pb-0" style="padding:24px 24px 0;">
+                <div style="width:48px;height:48px;border-radius:12px;background:#fdecea;display:flex;align-items:center;justify-content:center;">
+                    <i class="bi bi-trash3-fill" style="font-size:1.3rem;color:#c62828;"></i>
+                </div>
+            </div>
+            <div class="modal-body" style="padding:16px 24px 8px;">
+                <h5 style="font-weight:700;color:#1a2e1a;margin-bottom:8px;">¿Eliminar jornal?</h5>
+                <p style="font-size:0.88rem;color:#6b7c6b;margin:0;">
+                    Se eliminará el jornal del <strong id="jornal-fecha-modal" style="color:#1a2e1a;"></strong>.
+                    Esta acción no se puede deshacer.
+                </p>
+            </div>
+            <div class="modal-footer border-0 d-flex" style="padding:16px 24px 24px;gap:10px;">
+                <button type="button" class="btn" data-bs-dismiss="modal"
+                    style="flex:1;border-radius:9px;border:1.5px solid #d4e0d4;background:#fff;color:#3a4f3a;font-weight:600;padding:9px;">
+                    Cancelar
+                </button>
+                <button type="button" onclick="document.getElementById('formEliminarJornal').submit()"
+                    style="flex:1;border-radius:9px;border:none;background:linear-gradient(135deg,#c62828,#d32f2f);color:#fff;font-weight:600;padding:9px;cursor:pointer;box-shadow:0 2px 8px rgba(198,40,40,0.30);">
+                    <i class="bi bi-trash3 me-1"></i> Sí, eliminar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,448 @@
+{% extends 'base.html' %}
+<!-- campanas/detalle.html — Resumen financiero de una campaña: costos, ingresos y balance.
+   Muestra movimientos y ventas asociados. Controlador: campana_controller.py línea 68. -->
+{% block title %}{{ campana.nombre }} · El Cafetero de Nufi{% endblock %}
+
+{% block styles %}
+<style>
+    /* ── Header ── */
+    .page-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 28px; }
+    .btn-back {
+        width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0; margin-top: 3px;
+        border: 1.5px solid #d4e0d4; background: #fff; color: #2e7d32;
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: 1rem; text-decoration: none; transition: all 0.15s;
+    }
+    .btn-back:hover { background: #e8f5e9; border-color: #a5d6a7; color: #1b5e20; }
+    .page-title { font-size: 1.3rem; font-weight: 700; color: #1a2e1a; margin: 0; }
+
+    /* ── KPI cards ── */
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+    @media(max-width:900px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media(max-width:500px) { .kpi-grid { grid-template-columns: 1fr; } }
+    .kpi-card {
+        background: #fff; border-radius: 13px;
+        border: 1px solid #e8f0e8; padding: 18px 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .kpi-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7c6b; margin-bottom: 6px; }
+    .kpi-value { font-size: 1.45rem; font-weight: 800; }
+    .kpi-sub   { font-size: 0.78rem; color: #94a894; margin-top: 4px; }
+    .kpi-costos        .kpi-value { color: #c62828; }
+    .kpi-ingresos      .kpi-value { color: #2e7d32; }
+    .kpi-balance-pos   .kpi-value { color: #2e7d32; }
+    .kpi-balance-neg   .kpi-value { color: #c62828; }
+    .kpi-balance-neu   .kpi-value { color: #6b7c6b; }
+    .kpi-presupuesto   .kpi-value { color: #1565c0; }
+    .kpi-disponible-pos .kpi-value { color: #2e7d32; }
+    .kpi-disponible-neg .kpi-value { color: #c62828; }
+
+    /* ── Balance card grande ── */
+    .balance-banner {
+        border-radius: 14px; padding: 18px 24px; margin-bottom: 24px;
+        display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+    }
+    .balance-banner.positivo { background: linear-gradient(135deg, #2e7d32, #388e3c); }
+    .balance-banner.negativo { background: linear-gradient(135deg, #c62828, #d32f2f); }
+    .balance-banner.neutro   { background: linear-gradient(135deg, #4a7c4a, #5a8c5a); }
+    .balance-banner-label { color: rgba(255,255,255,0.80); font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+    .balance-banner-valor { color: #fff; font-size: 2rem; font-weight: 800; }
+
+    /* ── Secciones ── */
+    .section-card {
+        background: #fff; border-radius: 14px;
+        border: 1px solid #e8f0e8; overflow: hidden; margin-bottom: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .section-header {
+        padding: 13px 20px; border-bottom: 1px solid #f0f4f0;
+        background: #fafcfa; font-size: 0.85rem; font-weight: 600; color: #3a4f3a;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .section-header i { color: #2e7d32; }
+
+    /* ── Tabla interna ── */
+    .det-table { width: 100%; border-collapse: collapse; }
+    .det-table th { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7c6b; padding: 10px 16px; border-bottom: 1px solid #f0f4f0; white-space: nowrap; text-align: center; }
+    .det-table td { padding: 11px 16px; border-bottom: 1px solid #f7faf7; font-size: 0.86rem; vertical-align: middle; text-align: center; }
+    .det-table tr:last-child td { border-bottom: none; }
+    .det-table tr:hover td { background: #fafcfa; }
+
+    /* ── Badges ── */
+    .badge-entrada { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; padding: 2px 9px; border-radius: 20px; font-size: 0.76rem; font-weight: 600; }
+    .badge-salida  { background: #fdecea; color: #c62828; border: 1px solid #ffcdd2; padding: 2px 9px; border-radius: 20px; font-size: 0.76rem; font-weight: 600; }
+    .badge-activa  { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; padding: 3px 10px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; }
+
+    /* ── Botón cerrar ── */
+    .btn-cerrar {
+        padding: 8px 16px; border-radius: 9px;
+        border: 1.5px solid #ffcdd2; background: #fff;
+        color: #c62828; font-size: 0.85rem; font-weight: 600;
+        cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+        transition: all 0.15s;
+    }
+    .btn-cerrar:hover { background: #fdecea; }
+
+    /* ── Empty ── */
+    .empty-mini { text-align: center; padding: 28px; color: #94a894; font-size: 0.85rem; }
+
+    /* ── Animaciones ── */
+    .page-header    { animation: detIn 0.3s ease both; }
+    .kpi-grid       { animation: detIn 0.35s ease 0.05s both; }
+    .balance-banner { animation: detIn 0.38s ease 0.08s both; }
+    .section-card   { animation: detIn 0.4s ease 0.10s both; }
+    @keyframes detIn {
+        from { opacity: 0; transform: translateY(12px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb-nav">
+    <a href="{{ url_for('trabajadores.hub_operaciones') }}">Operaciones</a>
+    <span class="bc-sep">›</span>
+    <a href="{{ url_for('campanas.listar') }}">Temporadas</a>
+    <span class="bc-sep">›</span>
+    <span class="bc-current">{{ campana.nombre }}</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+
+<!-- Header -->
+<div class="page-header">
+    <a href="{{ url_for('campanas.listar') }}" class="btn-back">
+        <i class="bi bi-arrow-left"></i>
+    </a>
+    <div style="flex:1;">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <h4 class="page-title">{{ campana.nombre }}</h4>
+            {% if campana.estado == 'activa' %}
+            <span class="badge-activa"><i class="bi bi-circle-fill" style="font-size:0.5rem;vertical-align:middle;"></i> Activa</span>
+            {% endif %}
+        </div>
+        <span style="font-size:0.82rem;color:#6b7c6b;">
+            Inicio: {{ campana.fecha_inicio.strftime('%d/%m/%Y') }}
+            {% if campana.fecha_fin %} · Cierre: {{ campana.fecha_fin.strftime('%d/%m/%Y') }}{% endif %}
+            {% if campana.descripcion %} · {{ campana.descripcion }}{% endif %}
+        </span>
+    </div>
+    {% if campana.estado == 'activa' %}
+    <button type="button" class="btn-cerrar" onclick="bootstrap.Modal.getOrCreateInstance(document.getElementById('modalCerrarCampana')).show()">
+        <i class="bi bi-lock"></i> Cerrar campaña
+    </button>
+    <form method="POST" action="{{ url_for('campanas.cerrar', id=campana.id) }}" id="formCerrarCampana">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    </form>
+    {% endif %}
+</div>
+
+<!-- KPI cards -->
+{% set ingresos_total = campana.ingreso_ventas + campana.ingreso_salidas %}
+{% set bal = campana.balance %}
+{% set pres = campana.presupuesto_inicial | float %}
+{% set disp = campana.presupuesto_disponible %}
+<div class="kpi-grid">
+    {% if pres > 0 %}
+    <div class="kpi-card kpi-presupuesto">
+        <div class="kpi-label"><i class="bi bi-wallet2 me-1"></i>Presupuesto inicial</div>
+        <div class="kpi-value">${{ '{:,.2f}'.format(pres) }}</div>
+        <div class="kpi-sub">Capital con el que arrancó la campaña</div>
+    </div>
+    {% endif %}
+    <div class="kpi-card kpi-costos">
+        <div class="kpi-label"><i class="bi bi-arrow-down-circle me-1"></i>Costos de producción</div>
+        <div class="kpi-value">${{ '{:,.2f}'.format(campana.costo_total) }}</div>
+        <div class="kpi-sub">
+            Insumos: ${{ '{:,.2f}'.format(campana.costo_total - campana.costo_mano_obra) }} &nbsp;·&nbsp;
+            Mano de obra: ${{ '{:,.2f}'.format(campana.costo_mano_obra) }}
+        </div>
+    </div>
+    <div class="kpi-card kpi-ingresos">
+        <div class="kpi-label"><i class="bi bi-arrow-up-circle me-1"></i>Ingresos</div>
+        <div class="kpi-value">${{ '{:,.2f}'.format(ingresos_total) }}</div>
+        <div class="kpi-sub">
+            Ventas: ${{ '{:,.2f}'.format(campana.ingreso_ventas) }} &nbsp;·&nbsp;
+            Salidas: ${{ '{:,.2f}'.format(campana.ingreso_salidas) }}
+        </div>
+    </div>
+    <div class="kpi-card {{ 'kpi-balance-pos' if bal > 0 else ('kpi-balance-neg' if bal < 0 else 'kpi-balance-neu') }}">
+        <div class="kpi-label"><i class="bi bi-graph-up me-1"></i>Balance neto</div>
+        <div class="kpi-value">{{ '+' if bal > 0 else '' }}${{ '{:,.2f}'.format(bal) }}</div>
+        <div class="kpi-sub">Ingresos − costos de producción</div>
+    </div>
+    {% if pres > 0 %}
+    <div class="kpi-card {{ 'kpi-disponible-pos' if disp >= 0 else 'kpi-disponible-neg' }}">
+        <div class="kpi-label"><i class="bi bi-cash-coin me-1"></i>Presupuesto disponible</div>
+        <div class="kpi-value">{{ '+' if disp >= 0 else '' }}${{ '{:,.2f}'.format(disp) }}</div>
+        <div class="kpi-sub">Inicial − costos ejecutados</div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Banner balance -->
+<div class="balance-banner {{ 'positivo' if campana.balance > 0 else ('negativo' if campana.balance < 0 else 'neutro') }}">
+    <div>
+        <div class="balance-banner-label">Rentabilidad de la temporada</div>
+        <div class="balance-banner-valor">
+            {{ '+' if campana.balance > 0 else '' }}${{ '{:,.2f}'.format(campana.balance) }}
+        </div>
+    </div>
+    <i class="bi {{ 'bi-trending-up' if campana.balance >= 0 else 'bi-trending-down' }}" style="font-size:2.5rem;color:rgba(255,255,255,0.35);"></i>
+</div>
+
+<!-- Movimientos asociados -->
+<div class="section-card">
+    <div class="section-header">
+        <i class="bi bi-arrow-left-right"></i>
+        Movimientos asociados
+        <span style="margin-left:auto;font-weight:400;color:#94a894;">{{ campana.movimientos|length }} registros</span>
+    </div>
+    {% if campana.movimientos %}
+    <div class="table-scroll">
+        <table class="det-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Elemento</th>
+                    <th>Tipo</th>
+                    <th style="text-align:right;">Cantidad</th>
+                    <th style="text-align:right;">Valor</th>
+                    <th>Observación</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in campana.movimientos|sort(attribute='fecha', reverse=True) %}
+                <tr>
+                    <td class="td-sub" style="white-space:nowrap;">{{ m.fecha.strftime('%d/%m/%Y') }}</td>
+                    <td style="font-weight:600;">{{ m.elemento.nombre }}</td>
+                    <td>
+                        {% if m.tipo == 'entrada' %}
+                        <span class="badge-entrada">Entrada</span>
+                        {% else %}
+                        <span class="badge-salida">Salida</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align:right;">{{ m.cantidad|float|round(2)|string }} {{ m.elemento.unidad_medida }}</td>
+                    <td style="text-align:right;font-weight:600;">
+                        {% if m.valor > 0 %}
+                        ${{ '{:,.2f}'.format(m.valor) }}
+                        {% else %}
+                        <span style="color:#94a894;">Donación</span>
+                        {% endif %}
+                    </td>
+                    <td class="td-sub">{{ m.observacion or '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-mini">No hay movimientos asociados a esta campaña.</div>
+    {% endif %}
+</div>
+
+<!-- Jornales asociados -->
+<div class="section-card">
+    <div class="section-header">
+        <i class="bi bi-person-badge"></i>
+        Jornales pagados
+        <span style="margin-left:auto;font-weight:400;color:#94a894;">{{ campana.jornales|length }} registros</span>
+        {% if campana.estado == 'activa' %}
+        <a href="{{ url_for('trabajadores.nuevo_jornal', campana_id=campana.id) }}"
+           style="margin-left:12px;padding:4px 12px;border-radius:7px;border:none;background:linear-gradient(135deg,#2e7d32,#388e3c);color:#fff;font-size:0.8rem;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:5px;">
+            <i class="bi bi-plus-lg"></i> Registrar jornal
+        </a>
+        {% endif %}
+    </div>
+    {% if campana.jornales %}
+    <div class="table-scroll">
+        <table class="det-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Trabajador</th>
+                    <th style="text-align:right;">Jornales</th>
+                    <th style="text-align:right;">Valor/Jornal</th>
+                    <th style="text-align:right;">Total</th>
+                    <th>Observación</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for j in campana.jornales|sort(attribute='fecha', reverse=True) %}
+                <tr>
+                    <td class="td-sub" style="white-space:nowrap;">{{ j.fecha.strftime('%d/%m/%Y') }}</td>
+                    <td style="font-weight:600;">
+                        <a href="{{ url_for('trabajadores.detalle', id=j.trabajador_id) }}"
+                           style="color:#1a2e1a;text-decoration:none;">{{ j.trabajador.nombre }}</a>
+                    </td>
+                    <td style="text-align:right;">{{ j.cantidad_jornales|float }}</td>
+                    <td style="text-align:right;" class="td-sub">${{ '{:,.2f}'.format(j.valor_jornal) }}</td>
+                    <td style="text-align:right;font-weight:700;color:#c62828;">${{ '{:,.2f}'.format(j.total) }}</td>
+                    <td class="td-sub">{{ j.observacion or '—' }}</td>
+                    <td>
+                        <button type="button"
+                                class="btn-eliminar-jornal"
+                                data-action="{{ url_for('trabajadores.eliminar_jornal', id=j.id) }}"
+                                data-nombre="{{ j.trabajador.nombre }}"
+                                style="padding:4px 9px;border-radius:7px;border:1.5px solid #ffcdd2;background:#fff;color:#c62828;font-size:0.78rem;cursor:pointer;transition:all 0.15s;"
+                                onmouseover="this.style.background='#fdecea'" onmouseout="this.style.background='#fff'">
+                            <i class="bi bi-trash3"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="4" style="text-align:right;font-size:0.82rem;font-weight:700;color:#3a4f3a;padding:12px 16px;border-top:2px solid #f0f4f0;">Total mano de obra:</td>
+                    <td style="text-align:right;font-weight:800;color:#c62828;padding:12px 16px;border-top:2px solid #f0f4f0;">${{ '{:,.2f}'.format(campana.costo_mano_obra) }}</td>
+                    <td colspan="2" style="border-top:2px solid #f0f4f0;"></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-mini">
+        No hay jornales registrados en esta temporada.
+        {% if campana.estado == 'activa' %}
+        <a href="{{ url_for('trabajadores.nuevo_jornal', campana_id=campana.id) }}" style="color:#2e7d32;font-weight:600;">Registrar el primero</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- Ventas asociadas -->
+<div class="section-card">
+    <div class="section-header">
+        <i class="bi bi-cart3"></i>
+        Ventas asociadas
+        <span style="margin-left:auto;font-weight:400;color:#94a894;">{{ campana.ventas|length }} facturas</span>
+    </div>
+    {% if campana.ventas %}
+    <div class="table-scroll">
+        <table class="det-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Fecha</th>
+                    <th>Cliente</th>
+                    <th>Total</th>
+                    <th>Estado</th>
+                    <th>Detalle</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for v in campana.ventas|sort(attribute='fecha', reverse=True) %}
+                <tr>
+                    <td class="td-muted" style="font-weight:600;">#{{ '%04d' % v.id }}</td>
+                    <td class="td-sub" style="white-space:nowrap;">{{ v.fecha.strftime('%d/%m/%Y') }}</td>
+                    <td style="font-weight:500;">{{ v.cliente.nombre }}</td>
+                    <td style="font-weight:600;color:{{ '#c62828' if v.anulada else '#2e7d32' }};{{ 'text-decoration:line-through;' if v.anulada }}">${{ '{:,.2f}'.format(v.total) }}</td>
+                    <td>
+                        {% if v.anulada %}
+                        <span style="background:#fdecea;color:#c62828;border:1px solid #ffcdd2;border-radius:20px;padding:2px 9px;font-size:0.76rem;font-weight:600;">Anulada</span>
+                        {% else %}
+                        <span style="background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;border-radius:20px;padding:2px 9px;font-size:0.76rem;font-weight:600;">Válida</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{{ url_for('ventas.detalle', id=v.id) }}" style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;border:1.5px solid #d4e0d4;background:#fff;color:#2e7d32;text-decoration:none;transition:all 0.15s;" title="Ver factura" onmouseover="this.style.background='#e8f5e9'" onmouseout="this.style.background='#fff'">
+                            <i class="bi bi-eye" style="font-size:0.85rem;"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-mini">No hay ventas asociadas a esta campaña.</div>
+    {% endif %}
+</div>
+
+<!-- Form oculto para eliminar jornal (acción dinámica) -->
+<form method="POST" id="formEliminarJornal" action="">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
+
+<script>
+document.querySelectorAll('.btn-eliminar-jornal').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.getElementById('formEliminarJornal').action = btn.dataset.action;
+        document.getElementById('jornal-nombre-modal').textContent = btn.dataset.nombre;
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEliminarJornal')).show();
+    });
+});
+</script>
+{% endblock %}
+
+{% block modals %}
+<!-- Modal eliminar jornal -->
+<div class="modal fade" id="modalEliminarJornal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:400px;">
+        <div class="modal-content border-0" style="border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.15);">
+            <div class="modal-header border-0 pb-0" style="padding:24px 24px 0;">
+                <div style="width:48px;height:48px;border-radius:12px;background:#fdecea;display:flex;align-items:center;justify-content:center;">
+                    <i class="bi bi-trash3-fill" style="font-size:1.3rem;color:#c62828;"></i>
+                </div>
+            </div>
+            <div class="modal-body" style="padding:16px 24px 8px;">
+                <h5 style="font-weight:700;color:#1a2e1a;margin-bottom:8px;">¿Eliminar jornal?</h5>
+                <p style="font-size:0.88rem;color:#6b7c6b;margin:0;">
+                    Se eliminará el jornal de <strong id="jornal-nombre-modal" style="color:#1a2e1a;"></strong>.
+                    Esta acción no se puede deshacer.
+                </p>
+            </div>
+            <div class="modal-footer border-0 d-flex" style="padding:16px 24px 24px;gap:10px;">
+                <button type="button" class="btn" data-bs-dismiss="modal"
+                    style="flex:1;border-radius:9px;border:1.5px solid #d4e0d4;background:#fff;color:#3a4f3a;font-weight:600;padding:9px;">
+                    Cancelar
+                </button>
+                <button type="button" onclick="document.getElementById('formEliminarJornal').submit()"
+                    style="flex:1;border-radius:9px;border:none;background:linear-gradient(135deg,#c62828,#d32f2f);color:#fff;font-weight:600;padding:9px;cursor:pointer;box-shadow:0 2px 8px rgba(198,40,40,0.30);">
+                    <i class="bi bi-trash3 me-1"></i> Sí, eliminar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if campana.estado == 'activa' %}
+<div class="modal fade" id="modalCerrarCampana" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:420px;">
+        <div class="modal-content border-0" style="border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.15);">
+            <div class="modal-header border-0 pb-0" style="padding:24px 24px 0;">
+                <div style="width:48px;height:48px;border-radius:12px;background:#fdecea;display:flex;align-items:center;justify-content:center;">
+                    <i class="bi bi-lock-fill" style="font-size:1.3rem;color:#c62828;"></i>
+                </div>
+            </div>
+            <div class="modal-body" style="padding:16px 24px 8px;">
+                <h5 style="font-weight:700;color:#1a2e1a;margin-bottom:8px;">¿Cerrar temporada?</h5>
+                <p style="font-size:0.88rem;color:#6b7c6b;margin:0;">
+                    Se registrará <strong>hoy</strong> como fecha de cierre de
+                    <strong style="color:#1a2e1a;">{{ campana.nombre }}</strong>.
+                    Esta acción no se puede deshacer.
+                </p>
+                <div style="margin-top:14px;background:#f4f8f4;border-radius:10px;padding:12px 14px;font-size:0.83rem;color:#4a7c4a;">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Los movimientos y ventas ya asociados quedarán guardados en el historial.
+                </div>
+            </div>
+            <div class="modal-footer border-0 d-flex" style="padding:16px 24px 24px;gap:10px;">
+                <button type="button" class="btn" data-bs-dismiss="modal"
+                    style="flex:1;border-radius:9px;border:1.5px solid #d4e0d4;background:#fff;color:#3a4f3a;font-weight:600;padding:9px;">
+                    Cancelar
+                </button>
+                <button type="button" onclick="document.getElementById('formCerrarCampana').submit()"
+                    style="flex:1;border-radius:9px;border:none;background:linear-gradient(135deg,#c62828,#d32f2f);color:#fff;font-weight:600;padding:9px;cursor:pointer;box-shadow:0 2px 8px rgba(198,40,40,0.30);">
+                    <i class="bi bi-lock me-1"></i> Sí, cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

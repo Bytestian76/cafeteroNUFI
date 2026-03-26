@@ -1,4 +1,8 @@
 {% extends 'base.html' %}
+<!-- auth/usuarios.html — Gestión de usuarios del sistema.
+   Lista todos los usuarios con botones desactivar/activar (form POST).
+   Eliminar/desactivar abre modal de confirmación antes de enviar.
+   Lógica en auth_controller.py: desactivar_usuario línea 264, activar_usuario línea 281. -->
 {% block title %}Usuarios · El Cafetero de Nufi{% endblock %}
 
 {% block content %}
@@ -37,28 +41,13 @@
                     </td>
                     <td>{{ u.created_at.strftime('%d/%m/%Y') if u.created_at else '—' }}</td>
                     <td>
-                        <a href="{{ url_for('auth.editar_usuario', id=u.id) }}"
-                            class="btn btn-sm btn-outline-primary">
-                            <i class="bi bi-pencil"></i> Editar
-                        </a>
+                        <a href="{{ url_for('auth.editar_usuario', id=u.id) }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i> Editar</a>
 
                         {% if u.id != current_user.id %}
                             {% if u.activo %}
-                            <button type="button" class="btn btn-sm btn-outline-danger"
-                                data-id="{{ u.id }}"
-                                data-nombre="{{ u.nombre }}"
-                                data-accion="desactivar"
-                                onclick="confirmarUsuario(this)">
-                                <i class="bi bi-person-x"></i> Desactivar
-                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger" data-id="{{ u.id }}" data-nombre="{{ u.nombre }}" data-accion="desactivar" onclick="confirmarUsuario(this)"><i class="bi bi-person-x"></i> Desactivar</button>
                             {% else %}
-                            <button type="button" class="btn btn-sm btn-outline-success"
-                                data-id="{{ u.id }}"
-                                data-nombre="{{ u.nombre }}"
-                                data-accion="activar"
-                                onclick="confirmarUsuario(this)">
-                                <i class="bi bi-person-check"></i> Activar
-                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-success" data-id="{{ u.id }}" data-nombre="{{ u.nombre }}" data-accion="activar" onclick="confirmarUsuario(this)"><i class="bi bi-person-check"></i> Activar</button>
                             {% endif %}
                         {% endif %}
                     </td>
@@ -73,6 +62,9 @@
     </div>
 </div>
 
+{% endblock %}
+
+{% block modals %}
 <!-- ── MODAL CONFIRMACIÓN USUARIO ────────────────────────────────────────── -->
 <div class="modal fade" id="modalConfirmarUsuario" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-sm">
@@ -86,9 +78,7 @@
                 <p class="fw-bold mb-0" id="nombreUsuario"></p>
             </div>
             <div class="modal-footer justify-content-center border-0 pt-0">
-                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">
-                    Cancelar
-                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
                 <form id="formAccionUsuario" method="POST" class="d-inline">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-sm" id="btnConfirmarUsuario">
@@ -99,11 +89,14 @@
         </div>
     </div>
 </div>
-{% endblock %}
+{% endblock %}{# cierra block modals #}
 
 {% block scripts %}
 <script>
+let _usuarioBtn = null;
+
 function confirmarUsuario(btn) {
+    _usuarioBtn = btn;
     const id     = btn.dataset.id;
     const nombre = btn.dataset.nombre;
     const accion = btn.dataset.accion;
@@ -118,7 +111,45 @@ function confirmarUsuario(btn) {
     const btn2 = document.getElementById('btnConfirmarUsuario');
     btn2.className = 'btn btn-sm ' + (esDesactivar ? 'btn-danger' : 'btn-success');
     btn2.textContent = esDesactivar ? 'Sí, desactivar' : 'Sí, activar';
-    new bootstrap.Modal(document.getElementById('modalConfirmarUsuario')).show();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalConfirmarUsuario')).show();
 }
+
+document.getElementById('formAccionUsuario').addEventListener('submit', function(e) {
+    e.preventDefault();
+    fetch(this.action, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: new FormData(this) })
+        .then(r => r.json())
+        .then(function(data) {
+            bootstrap.Modal.getInstance(document.getElementById('modalConfirmarUsuario')).hide();
+            mostrarToast(data.msg, data.categoria);
+            if (!data.ok || !_usuarioBtn) return;
+            const accion = _usuarioBtn.dataset.accion;
+            const row    = _usuarioBtn.closest('tr');
+            const esDesact = accion === 'desactivar';
+            const id     = _usuarioBtn.dataset.id;
+            const nombre = _usuarioBtn.dataset.nombre;
+
+            // Row style
+            row.className = esDesact ? 'table-secondary text-muted' : '';
+
+            // Badge estado (td índice 3)
+            row.querySelectorAll('td')[3].innerHTML = esDesact
+                ? '<span class="badge bg-secondary">Inactivo</span>'
+                : '<span class="badge bg-success">Activo</span>';
+
+            // Reemplazar botón
+            const nuevoBtn = document.createElement('button');
+            nuevoBtn.type = 'button';
+            nuevoBtn.className = 'btn btn-sm ' + (esDesact ? 'btn-outline-success' : 'btn-outline-danger');
+            nuevoBtn.dataset.id     = id;
+            nuevoBtn.dataset.nombre = nombre;
+            nuevoBtn.dataset.accion = esDesact ? 'activar' : 'desactivar';
+            nuevoBtn.innerHTML = esDesact
+                ? '<i class="bi bi-person-check"></i> Activar'
+                : '<i class="bi bi-person-x"></i> Desactivar';
+            nuevoBtn.setAttribute('onclick', 'confirmarUsuario(this)');
+            _usuarioBtn.replaceWith(nuevoBtn);
+            _usuarioBtn = null;
+        });
+});
 </script>
 {% endblock %}

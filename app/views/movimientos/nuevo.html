@@ -1,65 +1,359 @@
 {% extends 'base.html' %}
+<!-- movimientos/nuevo.html — Formulario para registrar una entrada o salida de inventario.
+   JS: actualizarStock() muestra el stock disponible del elemento seleccionado con
+   indicador de alerta si el stock está bajo. El servidor valida que la salida no exceda
+   el stock disponible (movimiento_controller.py línea 99). -->
 {% block title %}Nuevo Movimiento · El Cafetero de Nufi{% endblock %}
+
+{% block styles %}
+<style>
+    /* ── Layout ── */
+    .page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+    .page-title  { font-size: 1.4rem; font-weight: 700; color: #1a2e1a; margin: 0; }
+    .btn-back {
+        width: 36px; height: 36px;
+        border-radius: 10px;
+        border: 1.5px solid #d4e0d4;
+        background: #fff;
+        color: #2e7d32;
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: 1rem;
+        text-decoration: none;
+        transition: all 0.15s;
+        flex-shrink: 0;
+    }
+    .btn-back:hover { background: #e8f5e9; border-color: #a5d6a7; color: #1b5e20; }
+
+    /* ── Card ── */
+    .form-card {
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        border: 1px solid #e8f0e8;
+        overflow: hidden;
+    }
+    .form-card-header {
+        padding: 14px 24px;
+        border-bottom: 1px solid #f0f4f0;
+        background: #fafcfa;
+        display: flex; align-items: center; gap: 8px;
+        font-size: 0.88rem; font-weight: 600; color: #1a2e1a;
+    }
+    .form-card-header i { color: #2e7d32; }
+    .form-card-body { padding: 28px 24px; }
+
+    /* ── Inputs ── */
+    .field-label {
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #3a4f3a;
+        margin-bottom: 6px;
+        display: block;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+    .field-hint { font-size: 0.78rem; color: #94a894; margin-top: 4px; }
+    .dash-input {
+        width: 100%;
+        border: 1.5px solid #d4e0d4;
+        border-radius: 9px;
+        padding: 9px 12px;
+        font-size: 0.88rem;
+        color: #1b2e1b;
+        background: #fff;
+        outline: none;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .dash-input:focus { border-color: #2e7d32; box-shadow: 0 0 0 3px rgba(46,125,50,0.10); }
+
+    /* ── Prefijo en campos de dinero ── */
+    .input-prefix-group { display: flex; }
+    .input-prefix {
+        display: flex; align-items: center;
+        padding: 9px 12px;
+        background: #f4f8f4;
+        border: 1.5px solid #d4e0d4;
+        border-right: none;
+        border-radius: 9px 0 0 9px;
+        font-size: 0.88rem; color: #6b7c6b; font-weight: 600;
+    }
+    .input-prefix + .dash-input { border-radius: 0 9px 9px 0; }
+    .dash-select-full {
+        width: 100%;
+        border: 1.5px solid #d4e0d4;
+        border-radius: 9px;
+        padding: 9px 12px;
+        font-size: 0.88rem;
+        color: #1b2e1b;
+        background: #fff;
+        outline: none;
+        cursor: pointer;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        appearance: auto;
+    }
+    .dash-select-full:focus { border-color: #2e7d32; box-shadow: 0 0 0 3px rgba(46,125,50,0.10); }
+
+    /* ── Preview de stock ── */
+    .stock-preview {
+        margin-top: 0;
+        padding: 10px 14px;
+        border-radius: 9px;
+        background: #f4f8f4;
+        border: 1px solid #e8f0e8;
+        font-size: 0.85rem;
+        color: #3a4f3a;
+        display: block !important;
+        max-height: 0; overflow: hidden;
+        opacity: 0;
+        transition: max-height 0.3s ease, opacity 0.25s ease, margin-top 0.25s ease;
+    }
+    .stock-preview.visible {
+        max-height: 60px; opacity: 1; margin-top: 8px;
+    }
+    .stock-alerta { background: #fff8f8; border-color: #ffcdd2; color: #c62828; }
+
+    /* ── Animaciones de entrada ── */
+    .page-header { animation: movCardIn 0.3s ease both; }
+    .form-card   { animation: movCardIn 0.38s ease 0.06s both; }
+    @keyframes movCardIn {
+        from { opacity: 0; transform: translateY(14px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Shimmer en botón submit ── */
+    .btn-submit { position: relative; overflow: hidden; }
+    .btn-submit::before {
+        content: '';
+        position: absolute; top: 0; left: -100%;
+        width: 55%; height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.20), transparent);
+        transform: skewX(-18deg);
+        animation: shimMov 3s ease-in-out infinite;
+    }
+    @keyframes shimMov { 0% { left: -100%; } 55%, 100% { left: 160%; } }
+
+    /* ── Tipo pills ── */
+    .tipo-pills { display: flex; gap: 10px; }
+    .tipo-pill {
+        flex: 1;
+        padding: 12px;
+        border-radius: 10px;
+        border: 2px solid #e8f0e8;
+        background: #fafcfa;
+        cursor: pointer;
+        text-align: center;
+        transition: all 0.22s cubic-bezier(0.34, 1.28, 0.64, 1);
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #6b7c6b;
+        position: relative;
+    }
+    .tipo-pill:hover { border-color: #a5d6a7; background: #f4f8f4; transform: scale(1.02); }
+    .tipo-pill input[type=radio] { position: absolute; opacity: 0; width: 0; height: 0; }
+    .tipo-pill.selected-entrada { border-color: #2e7d32; background: #e8f5e9; color: #2e7d32; transform: scale(1.04); }
+    .tipo-pill.selected-salida  { border-color: #c62828; background: #fce4ec; color: #c62828; transform: scale(1.04); }
+    .tipo-pill i { font-size: 1.3rem; display: block; margin-bottom: 4px; }
+
+    /* ── Botón submit ── */
+    .btn-submit {
+        width: 100%;
+        padding: 11px;
+        border-radius: 9px;
+        border: none;
+        background: linear-gradient(135deg, #2e7d32, #388e3c);
+        color: #fff;
+        font-size: 0.92rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex; align-items: center; justify-content: center; gap: 8px;
+        box-shadow: 0 2px 8px rgba(46,125,50,0.25);
+        transition: transform 0.15s, box-shadow 0.15s;
+        margin-top: 8px;
+    }
+    .btn-submit:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(46,125,50,0.35); }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb-nav">
+    <a href="{{ url_for('movimientos.historial') }}">Movimientos</a>
+    <span class="bc-sep">›</span>
+    <span class="bc-current">Registrar movimiento</span>
+</nav>
+{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-md-6">
+    <div class="col-md-6 col-lg-5">
 
-        <div class="d-flex align-items-center mb-4">
-            <a href="{{ url_for('movimientos.historial') }}" class="btn btn-outline-secondary btn-sm me-3">
+        <!-- Header -->
+        <div class="page-header">
+            <a href="{{ url_for('movimientos.historial') }}" class="btn-back">
                 <i class="bi bi-arrow-left"></i>
             </a>
-            <h3 class="fw-bold mb-0">Registrar Movimiento</h3>
+            <div>
+                <h4 class="page-title">Registrar Movimiento</h4>
+                <span style="font-size:0.82rem;color:#6b7c6b;">Entrada o salida de inventario</span>
+            </div>
         </div>
 
-        <div class="card border-0 shadow-sm">
-            <div class="card-body p-4">
-                <form method="POST">
+        <div class="form-card">
+            <div class="form-card-header">
+                <i class="bi bi-arrow-left-right"></i> Datos del movimiento
+            </div>
+            <div class="form-card-body">
+                <form method="POST" id="formMovimiento">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Elemento del inventario</label>
-                        <select name="elemento_id" class="form-select" required>
-                            <option value="">Seleccionar...</option>
+                    <input type="hidden" name="tipo" id="tipoHidden" required>
+
+                    <!-- Elemento -->
+                    <div class="mb-4">
+                        <label class="field-label">Elemento del inventario</label>
+                        <select name="elemento_id" id="selectElemento" class="dash-select-full" onchange="actualizarStock()" required>
+                            <option value="">Seleccionar elemento...</option>
                             {% for e in elementos %}
-                            <option value="{{ e.id }}">
-                                {{ e.nombre }} — Stock actual: {{ e.stock_actual }} {{ e.unidad_medida }}
-                                {% if e.tiene_alerta() %}⚠️{% endif %}
-                            </option>
+                            <option value="{{ e.id }}" data-stock="{{ e.stock_actual }}" data-minimo="{{ e.stock_minimo }}" data-unidad="{{ e.unidad_medida }}" data-alerta="{{ 'true' if e.tiene_alerta else 'false' }}">{{ e.nombre }}</option>
                             {% endfor %}
                         </select>
+                        <div class="stock-preview" id="stockPreview"></div>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Tipo de movimiento</label>
-                        <select name="tipo" class="form-select" required>
-                            <option value="">Seleccionar...</option>
-                            <option value="entrada">📥 Entrada</option>
-                            <option value="salida">📤 Salida</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Cantidad</label>
-                        <input type="number" name="cantidad" class="form-control"
-                               step="0.01" min="0.01" required>
-                    </div>
-
+                    <!-- Tipo -->
                     <div class="mb-4">
-                        <label class="form-label fw-semibold">Observación <span class="text-muted fw-normal">(opcional)</span></label>
-                        <textarea name="observacion" class="form-control" rows="3"
-                                  placeholder="Motivo o detalle del movimiento..."></textarea>
+                        <label class="field-label">Tipo de movimiento</label>
+                        <div class="tipo-pills">
+                            <div class="tipo-pill" id="pillEntrada" onclick="seleccionarTipo('entrada')">
+                                <input type="radio" name="_tipo_visual" value="entrada">
+                                <i class="bi bi-box-arrow-in-down"></i>
+                                Entrada
+                            </div>
+                            <div class="tipo-pill" id="pillSalida" onclick="seleccionarTipo('salida')">
+                                <input type="radio" name="_tipo_visual" value="salida">
+                                <i class="bi bi-box-arrow-up"></i>
+                                Salida
+                            </div>
+                        </div>
+                        <p class="field-hint" id="tipoHint">Selecciona si es una entrada o salida de stock.</p>
                     </div>
 
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-check-lg"></i> Registrar movimiento
-                        </button>
+                    <!-- Cantidad -->
+                    <div class="mb-4">
+                        <label class="field-label">Cantidad</label>
+                        <input type="number" name="cantidad" id="inputCantidad" class="dash-input" step="0.01" min="0.01" placeholder="0.00" required onfocus="if(this.value=='0')this.value=''">
                     </div>
 
+                    <!-- Valor económico -->
+                    <div class="mb-4">
+                        <label class="field-label" id="labelValor">Valor de la transacción</label>
+                        <div class="input-prefix-group">
+                            <span class="input-prefix">$</span>
+                            <input type="number" name="valor" id="inputValor" class="dash-input" step="0.01" min="0" value="0" placeholder="0.00" required onfocus="if(this.value=='0')this.value=''" onblur="if(this.value==='')this.value='0'">
+                        </div>
+                        <p class="field-hint" style="color:#94a894;">Ingresa 0 si fue donación o regalo entre fincas.</p>
+                    </div>
+
+                    <!-- Campaña activa (opcional) -->
+                    {% if campana_activa %}
+                    <div class="mb-4">
+                        <label class="field-label">Campaña</label>
+                        <div style="display:flex;align-items:center;gap:10px;background:#f4f8f4;border:1.5px solid #d4e0d4;border-radius:9px;padding:10px 14px;">
+                            <input type="checkbox" id="chkCampana" name="_asociar_campana" value="1" checked
+                                style="width:16px;height:16px;accent-color:#2e7d32;cursor:pointer;flex-shrink:0;"
+                                onchange="toggleCampana(this)">
+                            <input type="hidden" name="campana_id" id="inputCampanaId" value="{{ campana_activa.id }}">
+                            <label for="chkCampana" style="margin:0;cursor:pointer;font-size:0.86rem;color:#3a4f3a;flex:1;">
+                                Asociar a <strong>{{ campana_activa.nombre }}</strong>
+                                <span style="font-size:0.78rem;color:#94a894;display:block;margin-top:1px;">Desde {{ campana_activa.fecha_inicio.strftime('%d/%m/%Y') }}</span>
+                            </label>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Observación -->
+                    <div class="mb-4">
+                        <label class="field-label">
+                            Observación
+                            <span style="font-weight:400;text-transform:none;color:#94a894;letter-spacing:0;">(opcional)</span>
+                        </label>
+                        <textarea name="observacion" class="dash-input" rows="3" placeholder="Motivo o detalle del movimiento..." maxlength="255" id="txtObservacion"></textarea>
+                        <p class="field-hint" id="contadorObs">0 / 255 caracteres</p>
+                    </div>
+
+                    <button type="submit" class="btn-submit">
+                        <i class="bi bi-check-lg"></i> Registrar movimiento
+                    </button>
                 </form>
             </div>
         </div>
 
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* Actualiza el preview de stock al cambiar el elemento seleccionado → actualizarStock() */
+function actualizarStock() {
+    const sel     = document.getElementById('selectElemento');
+    const preview = document.getElementById('stockPreview');
+    const opt     = sel.options[sel.selectedIndex];
+
+    if (!opt || !opt.value) {
+        preview.className = 'stock-preview';
+        preview.innerHTML = '';
+        return;
+    }
+
+    const stock  = parseFloat(opt.dataset.stock);
+    const minimo = parseFloat(opt.dataset.minimo);
+    const unidad = opt.dataset.unidad;
+    const alerta = opt.dataset.alerta === 'true';
+
+    preview.className = 'stock-preview visible' + (alerta ? ' stock-alerta' : '');
+    preview.innerHTML = alerta
+        ? `<i class="bi bi-exclamation-triangle-fill me-1"></i><strong>Alerta de escasez</strong> — Stock: <strong>${stock}</strong> ${unidad} (mínimo: ${minimo})`
+        : `<i class="bi bi-check-circle me-1" style="color:#2e7d32"></i>Stock actual: <strong>${stock}</strong> ${unidad} (mínimo: ${minimo})`;
+}
+
+/* Selecciona el tipo de movimiento visualmente → conectado con #tipoHidden */
+function seleccionarTipo(tipo) {
+    document.getElementById('tipoHidden').value = tipo;
+    document.getElementById('pillEntrada').className = 'tipo-pill' + (tipo === 'entrada' ? ' selected-entrada' : '');
+    document.getElementById('pillSalida').className  = 'tipo-pill' + (tipo === 'salida'  ? ' selected-salida'  : '');
+    document.getElementById('tipoHint').textContent  = tipo === 'entrada'
+        ? 'Se sumará la cantidad al stock actual del elemento.'
+        : 'Se restará la cantidad del stock actual del elemento.';
+
+    // Actualizar etiqueta del campo valor según el tipo
+    const labelValor = document.getElementById('labelValor');
+    if (tipo === 'entrada') {
+        labelValor.textContent = 'Valor de adquisición (costo de compra)';
+    } else {
+        labelValor.textContent = 'Valor de la venta (ingreso recibido)';
+    }
+}
+
+/* Contador de caracteres en observación */
+const txtObs = document.getElementById('txtObservacion');
+const contador = document.getElementById('contadorObs');
+txtObs.addEventListener('input', function() {
+    const n = this.value.length;
+    contador.textContent = n + ' / 255 caracteres';
+    contador.style.color = n >= 240 ? '#c62828' : '#94a894';
+});
+
+/* Activa/desactiva el envío del campana_id según el checkbox */
+function toggleCampana(chk) {
+    const inp = document.getElementById('inputCampanaId');
+    if (inp) inp.disabled = !chk.checked;
+}
+
+/* Valida que se haya seleccionado tipo antes de enviar */
+document.getElementById('formMovimiento').addEventListener('submit', function(e) {
+    if (!document.getElementById('tipoHidden').value) {
+        e.preventDefault();
+        alert('Debes seleccionar un tipo de movimiento (Entrada o Salida).');
+    }
+});
+</script>
 {% endblock %}

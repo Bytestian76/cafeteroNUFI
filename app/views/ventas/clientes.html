@@ -1,58 +1,302 @@
 {% extends 'base.html' %}
+{# ventas/clientes.html — Directorio de clientes con KPI de total registrados.
+   Acciones: editar (link a form_cliente), eliminar (modal de confirmación).
+   Eliminar solo procede si el cliente no tiene ventas → lógica en venta_controller.py línea 268. #}
 {% block title %}Clientes · El Cafetero de Nufi{% endblock %}
 
+{% block styles %}
+<style>
+    /* ── Layout ── */
+    .dash-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; }
+    .dash-title  { font-size: 1.5rem; font-weight: 700; color: #1a2e1a; margin: 0; }
+
+    /* ── KPI mini ── */
+    .kpi-card {
+        background: #fff;
+        border-radius: 14px;
+        padding: 16px 20px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        border: 1px solid #e8f0e8;
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.09); }
+    .kpi-icon  { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; flex-shrink: 0; }
+    .kpi-green { background: #e8f5e9; color: #2e7d32; }
+    .kpi-teal  { background: #e0f2f1; color: #00695c; }
+    .kpi-value { font-size: 1.4rem; font-weight: 800; color: #1a2e1a; line-height: 1; }
+    .kpi-label { font-size: 0.75rem; color: #6b7c6b; margin-top: 3px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
+
+    /* ── Tabla ── */
+    .chart-card {
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        border: 1px solid #e8f0e8;
+        overflow: hidden;
+    }
+    .chart-card-header {
+        padding: 14px 20px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: #1a2e1a;
+        border-bottom: 1px solid #f0f4f0;
+        display: flex; align-items: center; gap: 8px;
+        background: #fafcfa;
+    }
+    .chart-card-header i { color: #2e7d32; font-size: 1rem; }
+
+    .dash-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; min-width: 520px; }
+    .dash-table thead tr { border-bottom: 2px solid #e8f0e8; }
+    .dash-table th { padding: 10px 16px; font-size: 0.75rem; font-weight: 700; color: #6b7c6b; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; text-align: center; }
+    .dash-table tbody tr { border-bottom: 1px solid #f4f8f4; transition: background 0.12s; }
+    .dash-table tbody tr:last-child { border-bottom: none; }
+    .dash-table tbody tr:hover { background: #f8faf7; }
+    .dash-table td { padding: 11px 16px; color: #2a3d2a; vertical-align: middle; text-align: center; }
+
+    /* ── Info cell ── */
+    .info-secundaria { font-size: 0.8rem; color: #94a894; margin-top: 2px; }
+
+    /* ── Botones de acción ── */
+    .btn-accion {
+        width: 32px; height: 32px;
+        border-radius: 8px;
+        border: 1.5px solid;
+        background: #fff;
+        cursor: pointer;
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: 0.85rem;
+        transition: all 0.15s;
+        text-decoration: none;
+    }
+    .btn-accion-edit { border-color: #d4e0d4; color: #2e7d32; }
+    .btn-accion-edit:hover { background: #e8f5e9; border-color: #a5d6a7; color: #1b5e20; }
+    .btn-accion-del { border-color: #f5c6cb; color: #c62828; }
+    .btn-accion-del:hover { background: #fdecea; border-color: #ef9a9a; color: #b71c1c; }
+
+    /* ── Botones principales ── */
+    .btn-primary-venta {
+        padding: 7px 16px;
+        border-radius: 9px;
+        border: none;
+        background: linear-gradient(135deg, #2e7d32, #388e3c);
+        color: #fff;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex; align-items: center; gap: 6px;
+        box-shadow: 0 2px 8px rgba(46,125,50,0.25);
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .btn-primary-venta:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(46,125,50,0.35); color: #fff; }
+    .btn-back {
+        width: 34px; height: 34px;
+        border-radius: 9px;
+        border: 1.5px solid #d4e0d4;
+        background: #fff;
+        color: #6b7c6b;
+        cursor: pointer;
+        display: inline-flex; align-items: center; justify-content: center;
+        text-decoration: none;
+        transition: all 0.15s;
+    }
+    .btn-back:hover { background: #f0f4f0; border-color: #a5d6a7; color: #2e7d32; }
+
+    /* ── Sin datos ── */
+    .no-data { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 140px; color: #94a894; font-size: 0.88rem; gap: 8px; }
+    .no-data i { font-size: 2rem; opacity: 0.4; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div class="d-flex align-items-center">
-        <a href="{{ url_for('ventas.listar') }}" class="btn btn-outline-secondary btn-sm me-3">
+
+<!-- Header -->
+<div class="dash-header">
+    <div class="d-flex align-items-center gap-3">
+        <a href="{{ url_for('ventas.listar') }}" class="btn-back">
             <i class="bi bi-arrow-left"></i>
         </a>
-        <h3 class="fw-bold mb-0"><i class="bi bi-people"></i> Clientes</h3>
+        <div>
+            <h4 class="dash-title"><i class="bi bi-people me-2" style="color:#2e7d32"></i>Clientes</h4>
+            <span style="font-size:0.82rem;color:#6b7c6b;">Gestión del directorio de clientes</span>
+        </div>
     </div>
-    
-    <a href="{{ url_for('ventas.nuevo_cliente') }}" class="btn btn-warning">
+    <a href="{{ url_for('ventas.nuevo_cliente') }}" class="btn-primary-venta">
         <i class="bi bi-plus-lg"></i> Nuevo Cliente
     </a>
 </div>
 
-<div class="card border-0 shadow-sm">
-    <div class="card-body p-0">
-        <table class="table table-hover mb-0">
-            <thead class="table-warning">
-                <tr>
-                    <th>#</th>
-                    <th>Nombre</th>
-                    <th>Documento</th>
-                    <th>Teléfono</th>
-                    <th>Dirección</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for c in clientes %}
-                <tr>
-                    <td>{{ c.id }}</td>
-                    <td>{{ c.nombre }}</td>
-                    <td>{{ c.documento or '—' }}</td>
-                    <td>{{ c.telefono or '—' }}</td>
-                    <td>{{ c.direccion or '—' }}</td>
-                    <td>
-                        
-                        <a href="{{ url_for('ventas.editar_cliente', id=c.id) }}"
-                            class="btn btn-sm btn-outline-primary">
-                            <i class="bi bi-pencil"></i>
-                        </a>
-                                        </td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="6" class="text-center text-muted py-4">
-                        No hay clientes registrados.
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+<!-- Mini KPIs -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="kpi-card">
+            <div class="kpi-icon kpi-teal"><i class="bi bi-people"></i></div>
+            <div>
+                <div class="kpi-value">{{ clientes | length }}</div>
+                <div class="kpi-label">Total clientes</div>
+            </div>
+        </div>
     </div>
 </div>
+
+<!-- Tabla -->
+<div class="chart-card">
+    <div class="chart-card-header">
+        <i class="bi bi-table"></i>
+        Directorio
+        <span style="font-weight:400;color:#94a894;font-size:0.78rem;margin-left:auto;">
+            {{ clientes | length }} registro(s)
+        </span>
+    </div>
+
+    <div class="table-scroll">
+    <table class="dash-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Nombre / Razón social</th>
+                <th>Documento</th>
+                <th>Contacto</th>
+                <th>Dirección</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in clientes %}
+            {% set es_cf = (c.id == cf_id) %}
+            <tr>
+                <td class="td-muted">#{{ c.id }}</td>
+                <td style="font-weight:600;">
+                    {{ c.nombre }}
+                    {% if es_cf %}<span style="font-size:0.7rem;font-weight:600;background:#e3f2fd;color:#1565c0;border-radius:20px;padding:2px 8px;margin-left:6px;vertical-align:middle;">Sistema</span>{% endif %}
+                </td>
+                <td class="td-sub">{{ c.documento or '—' }}</td>
+                <td class="td-sub">{{ c.telefono or '—' }}</td>
+                <td class="td-sub">{{ c.direccion or '—' }}</td>
+                <td style="display:flex;gap:6px;">
+                    {% if not es_cf %}
+                    <a href="{{ url_for('ventas.editar_cliente', id=c.id) }}" class="btn-accion btn-accion-edit" title="Editar"><i class="bi bi-pencil"></i></a>
+                    <button type="button" class="btn-accion btn-accion-del" title="Eliminar" onclick="abrirModalEliminar({{ c.id }}, '{{ c.nombre | replace("'", "\\'") }}', this)"><i class="bi bi-trash"></i></button>
+                    {% else %}
+                    <span style="font-size:0.75rem;color:#94a894;align-self:center;">—</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6">
+                    <div class="no-data" style="height:160px;gap:10px;">
+                        <i class="bi bi-people"></i>
+                        <span style="font-weight:600;color:#3a4f3a;">No hay clientes registrados</span>
+                        <a href="{{ url_for('ventas.nuevo_cliente') }}" style="font-size:0.82rem;color:#fff;text-decoration:none;background:#2e7d32;border-radius:8px;padding:5px 16px;font-weight:600;">
+                            <i class="bi bi-plus-lg me-1"></i>Nuevo cliente
+                        </a>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div><!-- /table-scroll -->
+</div>
+
+{% endblock %}
+
+{% block modals %}
+<!-- Modal de confirmación de eliminación -->
+<div class="modal fade" id="modalEliminar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:420px;">
+        <div class="modal-content" style="border-radius:16px;border:none;box-shadow:0 8px 32px rgba(0,0,0,0.15);">
+            <div class="modal-body" style="padding:32px 28px 24px;">
+                <div style="text-align:center;margin-bottom:20px;">
+                    <div style="width:56px;height:56px;border-radius:50%;background:#fdecea;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+                        <i class="bi bi-trash" style="font-size:1.5rem;color:#c62828;"></i>
+                    </div>
+                    <h5 style="font-weight:700;color:#1a2e1a;margin-bottom:8px;">Eliminar cliente</h5>
+                    <p style="color:#6b7c6b;font-size:0.9rem;margin:0;">
+                        ¿Estás seguro de que deseas eliminar a<br>
+                        <strong id="modal-nombre-cliente" style="color:#1a2e1a;"></strong>?<br>
+                        <span style="font-size:0.82rem;color:#c62828;">Esta acción no se puede deshacer.</span>
+                    </p>
+                </div>
+                <div style="display:flex;gap:10px;">
+                    <button type="button" class="btn w-50"
+                            style="border-radius:10px;border:1.5px solid #d4e0d4;color:#3a4f3a;font-weight:600;font-size:0.88rem;"
+                            data-bs-dismiss="modal">
+                        Cancelar
+                    </button>
+                    <!-- Form oculto que se envía al confirmar -->
+                    <form id="form-eliminar" method="POST" style="width:50%;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit"
+                                style="width:100%;border-radius:10px;border:none;background:#c62828;color:#fff;font-weight:700;font-size:0.88rem;padding:8px 0;cursor:pointer;">
+                            Sí, eliminar
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}{# cierra block modals #}
+
+{% block scripts %}
+<script>
+// ── Animaciones de entrada ────────────────────────────────────────────────────
+function entrarConTransicion(el, delay) {
+    if (!el) return;
+    el.style.opacity   = '0';
+    el.style.transform = 'translateY(12px)';
+    setTimeout(function() {
+        el.style.transition = 'opacity 0.34s ease, transform 0.34s ease';
+        el.style.opacity    = '1';
+        el.style.transform  = 'translateY(0)';
+        setTimeout(function() {
+            el.style.transition = '';
+            el.style.transform  = '';
+            el.style.opacity    = '';
+        }, 370);
+    }, delay);
+}
+
+document.querySelectorAll('.kpi-card').forEach(function(card, i) {
+    entrarConTransicion(card, 40 + i * 80);
+});
+
+document.querySelectorAll('.dash-table tbody tr').forEach(function(row, i) {
+    entrarConTransicion(row, 180 + i * 45);
+});
+
+let _eliminarBtn = null;
+
+/* Abre el modal y apunta el form al cliente correcto */
+function abrirModalEliminar(id, nombre, btn) {
+    _eliminarBtn = btn;
+    document.getElementById('modal-nombre-cliente').textContent = nombre;
+    document.getElementById('form-eliminar').action = '/ventas/clientes/eliminar/' + id;
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEliminar')).show();
+}
+
+document.getElementById('form-eliminar').addEventListener('submit', function(e) {
+    e.preventDefault();
+    fetch(this.action, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: new FormData(this) })
+        .then(r => r.json())
+        .then(function(data) {
+            bootstrap.Modal.getInstance(document.getElementById('modalEliminar')).hide();
+            mostrarToast(data.msg, data.categoria);
+            if (!data.ok || !_eliminarBtn) return;
+            const row = _eliminarBtn.closest('tr');
+            if (row) {
+                row.style.transition = 'opacity 0.4s ease';
+                row.style.opacity = '0';
+                setTimeout(function() { row.remove(); }, 420);
+            }
+            _eliminarBtn = null;
+        });
+});
+</script>
 {% endblock %}

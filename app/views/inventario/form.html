@@ -1,103 +1,361 @@
 {% extends 'base.html' %}
+<!-- inventario/form.html — Formulario de creación/edición de elemento de inventario.
+   Campos: nombre, categoría (select con preview badge), stock actual y mínimo,
+   unidad de medida (select con opción 'otro' que despliega campo personalizado).
+   JS: actualizarCategoria() muestra hint y badge; verificarOtro() controla el campo libre;
+   validación de nombre con al menos una letra antes de guardar.
+   Lógica del servidor: nuevo() e editar() en inventario_controller.py. -->
 {% block title %}{{ 'Editar' if elemento else 'Nuevo' }} Elemento · El Cafetero de Nufi{% endblock %}
+
+{% block styles %}
+<style>
+    /* ── Layout ── */
+    .page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+    .page-title  { font-size: 1.4rem; font-weight: 700; color: #1a2e1a; margin: 0; }
+    .btn-back {
+        width: 36px; height: 36px;
+        border-radius: 10px;
+        border: 1.5px solid #d4e0d4;
+        background: #fff;
+        color: #2e7d32;
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: 1rem;
+        text-decoration: none;
+        transition: all 0.15s;
+        flex-shrink: 0;
+    }
+    .btn-back:hover { background: #e8f5e9; border-color: #a5d6a7; color: #1b5e20; }
+
+    /* ── Card ── */
+    .form-card {
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        border: 1px solid #e8f0e8;
+        overflow: hidden;
+    }
+    .form-card-header {
+        padding: 14px 24px;
+        border-bottom: 1px solid #f0f4f0;
+        background: #fafcfa;
+        display: flex; align-items: center; gap: 8px;
+        font-size: 0.88rem; font-weight: 600; color: #1a2e1a;
+    }
+    .form-card-header i { color: #2e7d32; }
+    .form-card-body { padding: 28px 24px; }
+
+    /* ── Inputs ── */
+    .field-label {
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #3a4f3a;
+        margin-bottom: 6px;
+        display: block;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+    .dash-input {
+        width: 100%;
+        border: 1.5px solid #d4e0d4;
+        border-radius: 9px;
+        padding: 9px 12px;
+        font-size: 0.88rem;
+        color: #1b2e1b;
+        background: #fff;
+        outline: none;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        font-family: 'Segoe UI', sans-serif;
+    }
+    .dash-input:focus { border-color: #2e7d32; box-shadow: 0 0 0 3px rgba(46,125,50,0.10); }
+    .dash-input::placeholder { color: #b0c4b0; }
+
+    .dash-select {
+        width: 100%;
+        border: 1.5px solid #d4e0d4;
+        border-radius: 9px;
+        padding: 9px 12px;
+        font-size: 0.88rem;
+        color: #1b2e1b;
+        background: #fff;
+        outline: none;
+        cursor: pointer;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        font-family: 'Segoe UI', sans-serif;
+    }
+    .dash-select:focus { border-color: #2e7d32; box-shadow: 0 0 0 3px rgba(46,125,50,0.10); }
+
+    /* ── Separador de sección ── */
+    .field-divider {
+        border: none;
+        border-top: 1px solid #f0f4f0;
+        margin: 22px 0;
+    }
+
+    /* ── Botón submit ── */
+    .btn-submit {
+        width: 100%;
+        padding: 11px;
+        border-radius: 10px;
+        border: none;
+        background: linear-gradient(135deg, #2e7d32, #388e3c);
+        color: #fff;
+        font-size: 0.92rem;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex; align-items: center; justify-content: center; gap: 8px;
+        box-shadow: 0 2px 8px rgba(46,125,50,0.25);
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .btn-submit:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(46,125,50,0.35); }
+
+    /* ── Hint de categoría ── */
+    .cat-hint {
+        margin-top: 6px;
+        font-size: 0.78rem;
+        color: #6b7c6b;
+        display: none;
+    }
+    .cat-hint.visible { display: block; }
+
+    /* ── Badge de categoría preview ── */
+    .cat-preview {
+        display: inline-flex; align-items: center; gap: 5px;
+        border-radius: 20px; padding: 3px 10px;
+        font-size: 0.75rem; font-weight: 600;
+        margin-left: 10px;
+        vertical-align: middle;
+        opacity: 0; transform: scale(0.72); visibility: hidden;
+        transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.34, 1.35, 0.64, 1), visibility 0.22s;
+    }
+    .cat-preview.visible {
+        opacity: 1; transform: scale(1); visibility: visible;
+    }
+    .cat-insumo      { background: #e8f5e9; color: #2e7d32; }
+    .cat-maquinaria  { background: #e3f2fd; color: #1565c0; }
+    .cat-herramienta { background: #e0f2f1; color: #00695c; }
+    .cat-material    { background: #fff3e0; color: #e65100; }
+
+    /* ── Pills de categoría ── */
+    .cat-pills { display: flex; gap: 10px; }
+    .cat-pill {
+        border: 1.5px solid #d4e0d4;
+        border-radius: 12px;
+        padding: 14px 8px;
+        cursor: pointer;
+        text-align: center;
+        transition: all 0.15s;
+        position: relative;
+        flex: 1;
+    }
+    .cat-pill:hover { border-color: #a5d6a7; background: #f4f8f4; transform: scale(1.02); }
+    .cat-pill input[type=radio] { position: absolute; opacity: 0; width: 0; height: 0; }
+    .cat-pill i    { font-size: 1.3rem; display: block; margin-bottom: 5px; }
+    .cat-pill span { font-size: 0.76rem; font-weight: 600; }
+    .cat-pill.selected-insumo      { border-color: #2e7d32; background: #e8f5e9; color: #2e7d32; transform: scale(1.04); }
+    .cat-pill.selected-maquinaria  { border-color: #1565c0; background: #e3f2fd; color: #1565c0; transform: scale(1.04); }
+    .cat-pill.selected-herramienta { border-color: #00695c; background: #e0f2f1; color: #00695c; transform: scale(1.04); }
+    .cat-pill.selected-material    { border-color: #e65100; background: #fff3e0; color: #e65100; transform: scale(1.04); }
+
+    /* ── Animación entrada del card ── */
+    .page-header { animation: cardEntrar 0.3s ease both; }
+    .form-card   { animation: cardEntrar 0.38s ease 0.06s both; }
+    @keyframes cardEntrar {
+        from { opacity: 0; transform: translateY(14px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Slide-down del campo unidad personalizada ── */
+    #unidadPersonalizada {
+        display: block !important;
+        max-height: 0; overflow: hidden;
+        opacity: 0; margin-top: 0;
+        padding-top: 0; padding-bottom: 0;
+        transition: max-height 0.3s ease, opacity 0.25s ease, margin-top 0.25s ease,
+                    padding-top 0.25s ease, padding-bottom 0.25s ease;
+    }
+    #unidadPersonalizada.visible-smooth {
+        max-height: 56px; opacity: 1; margin-top: 8px;
+        padding-top: 9px; padding-bottom: 9px;
+    }
+
+    /* ── Shimmer en botón submit ── */
+    .btn-submit { position: relative; overflow: hidden; }
+    .btn-submit::before {
+        content: '';
+        position: absolute; top: 0; left: -100%;
+        width: 55%; height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.20), transparent);
+        transform: skewX(-18deg);
+        animation: shimmerSubmit 3s ease-in-out infinite;
+    }
+    @keyframes shimmerSubmit {
+        0%        { left: -100%; }
+        55%, 100% { left: 160%; }
+    }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb-nav">
+    <a href="{{ url_for('inventario.listar') }}">Inventario</a>
+    <span class="bc-sep">›</span>
+    <span class="bc-current">{{ 'Editar: ' + elemento.nombre if elemento else 'Nuevo elemento' }}</span>
+</nav>
+{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-md-6">
+    <div class="col-md-7 col-lg-6">
 
-        <div class="d-flex align-items-center mb-4">
-            <a href="{{ url_for('inventario.listar') }}" class="btn btn-outline-secondary btn-sm me-3">
+        <!-- Header -->
+        <div class="page-header">
+            <a href="{{ url_for('inventario.listar') }}" class="btn-back">
                 <i class="bi bi-arrow-left"></i>
             </a>
-            <h3 class="fw-bold mb-0">
-                {{ 'Editar Elemento' if elemento else 'Nuevo Elemento' }}
-            </h3>
+            <div>
+                <h4 class="page-title">
+                    {% if elemento %}
+                        <i class="bi bi-pencil-square me-2" style="color:#2e7d32;"></i>Editar Elemento
+                    {% else %}
+                        <i class="bi bi-plus-circle me-2" style="color:#2e7d32;"></i>Nuevo Elemento
+                    {% endif %}
+                </h4>
+            </div>
         </div>
 
-        <div class="card border-0 shadow-sm">
-            <div class="card-body p-4">
-                <form method="POST">
+        <!-- Formulario -->
+        <div class="form-card">
+            <div class="form-card-header">
+                <i class="bi bi-box-seam"></i>
+                {{ 'Editando: ' + elemento.nombre if elemento else 'Registrar nuevo elemento' }}
+            </div>
+            <div class="form-card-body">
+                {# fd: datos del POST si falló validación, para repoblar el form #}
+                {% set fd = form_data %}
+                {% set cat_sel = fd.get('categoria', '') if fd else (elemento.categoria if elemento else '') %}
+                {% set u_sel   = fd.get('unidad_medida', '') if fd else (elemento.unidad_medida if elemento else '') %}
+                {% set unidades_lista = ['kg','g','lb','t','arroba','L','mL','gal','unidad','bulto','saco','caja','paquete','rollo','m','m2','ha'] %}
+
+                <form method="POST" id="formElemento">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Nombre</label>
-                        <input type="text" name="nombre" class="form-control"
-                            value="{{ elemento.nombre if elemento else '' }}" required>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Categoría</label>
-                        <select name="categoria" class="form-select" required>
-                            <option value="">Seleccionar...</option>
-                            <option value="insumo"      {{ 'selected' if elemento and elemento.categoria=='insumo' }}>Insumo</option>
-                            <option value="maquinaria"  {{ 'selected' if elemento and elemento.categoria=='maquinaria' }}>Maquinaria</option>
-                            <option value="herramienta" {{ 'selected' if elemento and elemento.categoria=='herramienta' }}>Herramienta</option>
-                        </select>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label fw-semibold">Stock Actual</label>
-                            <input type="number" name="stock_actual" class="form-control"
-                                step="0.01" min="0"
-                                value="{{ elemento.stock_actual if elemento else '0' }}" required>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label fw-semibold">Stock Mínimo</label>
-                            <input type="number" name="stock_minimo" class="form-control"
-                                step="0.01" min="0"
-                                value="{{ elemento.stock_minimo if elemento else '0' }}" required>
-                        </div>
-                    </div>
-
+                    <!-- Nombre -->
                     <div class="mb-4">
-                        <label class="form-label fw-semibold">Unidad de Medida</label>
-                        <select name="unidad_medida" class="form-select" id="selectUnidad" required>
-                            <option value="">Seleccionar...</option>
-                            <!-- Masa / Peso -->
+                        <label class="field-label">Nombre del elemento</label>
+                        <input type="text" name="nombre" id="inputNombre" class="dash-input" placeholder="Ej: Café pergamino, Machete, Bomba de fumigación…" value="{{ fd.get('nombre', '') if fd else (elemento.nombre if elemento else '') }}" maxlength="20" required>
+                        <div class="cat-hint" id="nombreError" style="color:#c62828;"></div>
+                    </div>
+
+                    <!-- Categoría -->
+                    <div class="mb-4">
+                        <label class="field-label">
+                            Categoría
+                            <span class="cat-preview" id="catPreview"></span>
+                        </label>
+                        <input type="hidden" name="categoria" id="categoriaHidden" value="{{ cat_sel }}">
+                        <div class="cat-pills" id="catPills">
+                            <div class="cat-pill {{ 'selected-insumo' if cat_sel=='insumo' }}" onclick="seleccionarCategoria('insumo')">
+                                <input type="radio" name="_cat_radio" value="insumo" {{ 'checked' if cat_sel=='insumo' }}>
+                                <i class="bi bi-droplet-fill"></i><span>Insumo</span>
+                            </div>
+                            <div class="cat-pill {{ 'selected-maquinaria' if cat_sel=='maquinaria' }}" onclick="seleccionarCategoria('maquinaria')">
+                                <input type="radio" name="_cat_radio" value="maquinaria" {{ 'checked' if cat_sel=='maquinaria' }}>
+                                <i class="bi bi-gear-fill"></i><span>Maquinaria</span>
+                            </div>
+                            <div class="cat-pill {{ 'selected-herramienta' if cat_sel=='herramienta' }}" onclick="seleccionarCategoria('herramienta')">
+                                <input type="radio" name="_cat_radio" value="herramienta" {{ 'checked' if cat_sel=='herramienta' }}>
+                                <i class="bi bi-tools"></i><span>Herramienta</span>
+                            </div>
+                            <div class="cat-pill {{ 'selected-material' if cat_sel=='material' }}" onclick="seleccionarCategoria('material')">
+                                <input type="radio" name="_cat_radio" value="material" {{ 'checked' if cat_sel=='material' }}>
+                                <i class="bi bi-layers-fill"></i><span>Material</span>
+                            </div>
+                        </div>
+                        <div class="cat-hint" id="catHint"></div>
+                    </div>
+
+                    <hr class="field-divider">
+
+                    <!-- Stock -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-6">
+                            <label class="field-label">Stock actual</label>
+                            <input type="number" name="stock_actual" class="dash-input stock-input" step="0.01" min="0" placeholder="0" value="{{ fd.get('stock_actual', '0') if fd else (elemento.stock_actual if elemento else '0') }}" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="field-label">Stock mínimo</label>
+                            <input type="number" name="stock_minimo" class="dash-input stock-input" step="0.01" min="0" placeholder="0" value="{{ fd.get('stock_minimo', '0') if fd else (elemento.stock_minimo if elemento else '0') }}" required>
+                        </div>
+                    </div>
+
+                    <!-- Presentación -->
+                    <div class="mb-5">
+                        <label class="field-label">Presentación</label>
+                        <select name="unidad_medida" class="dash-select" id="selectUnidad" required onchange="verificarOtro(this)">
+                            <option value="">Seleccionar…</option>
                             <optgroup label="Masa / Peso">
-                                <option value="kg"  {{ 'selected' if elemento and elemento.unidad_medida=='kg' }}>Kilogramo (kg)</option>
-                                <option value="g"   {{ 'selected' if elemento and elemento.unidad_medida=='g' }}>Gramo (g)</option>
-                                <option value="lb"  {{ 'selected' if elemento and elemento.unidad_medida=='lb' }}>Libra (lb)</option>
-                                <option value="t"   {{ 'selected' if elemento and elemento.unidad_medida=='t' }}>Tonelada (t)</option>
-                                <option value="arroba" {{ 'selected' if elemento and elemento.unidad_medida=='arroba' }}>Arroba</option>
+                                <option value="kg"     {{ 'selected' if u_sel=='kg' }}>Kilogramo (kg)</option>
+                                <option value="g"      {{ 'selected' if u_sel=='g' }}>Gramo (g)</option>
+                                <option value="lb"     {{ 'selected' if u_sel=='lb' }}>Libra (lb)</option>
+                                <option value="t"      {{ 'selected' if u_sel=='t' }}>Tonelada (t)</option>
+                                <option value="arroba" {{ 'selected' if u_sel=='arroba' }}>Arroba</option>
                             </optgroup>
-                            <!-- Volumen -->
                             <optgroup label="Volumen">
-                                <option value="L"   {{ 'selected' if elemento and elemento.unidad_medida=='L' }}>Litro (L)</option>
-                                <option value="mL"  {{ 'selected' if elemento and elemento.unidad_medida=='mL' }}>Mililitro (mL)</option>
-                                <option value="gal" {{ 'selected' if elemento and elemento.unidad_medida=='gal' }}>Galón (gal)</option>
+                                <option value="L"   {{ 'selected' if u_sel=='L' }}>Litro (L)</option>
+                                <option value="mL"  {{ 'selected' if u_sel=='mL' }}>Mililitro (mL)</option>
+                                <option value="gal" {{ 'selected' if u_sel=='gal' }}>Galón (gal)</option>
                             </optgroup>
-                            <!-- Cantidad -->
                             <optgroup label="Cantidad">
-                                <option value="unidad"  {{ 'selected' if elemento and elemento.unidad_medida=='unidad' }}>Unidad</option>
-                                <option value="bulto"   {{ 'selected' if elemento and elemento.unidad_medida=='bulto' }}>Bulto</option>
-                                <option value="saco"    {{ 'selected' if elemento and elemento.unidad_medida=='saco' }}>Saco</option>
-                                <option value="caja"    {{ 'selected' if elemento and elemento.unidad_medida=='caja' }}>Caja</option>
-                                <option value="paquete" {{ 'selected' if elemento and elemento.unidad_medida=='paquete' }}>Paquete</option>
-                                <option value="rollo"   {{ 'selected' if elemento and elemento.unidad_medida=='rollo' }}>Rollo</option>
+                                <option value="unidad"  {{ 'selected' if u_sel=='unidad' }}>Unidad</option>
+                                <option value="bulto"   {{ 'selected' if u_sel=='bulto' }}>Bulto</option>
+                                <option value="saco"    {{ 'selected' if u_sel=='saco' }}>Saco</option>
+                                <option value="caja"    {{ 'selected' if u_sel=='caja' }}>Caja</option>
+                                <option value="paquete" {{ 'selected' if u_sel=='paquete' }}>Paquete</option>
+                                <option value="rollo"   {{ 'selected' if u_sel=='rollo' }}>Rollo</option>
                             </optgroup>
-                            <!-- Longitud / Área -->
                             <optgroup label="Longitud / Área">
-                                <option value="m"   {{ 'selected' if elemento and elemento.unidad_medida=='m' }}>Metro (m)</option>
-                                <option value="m2"  {{ 'selected' if elemento and elemento.unidad_medida=='m2' }}>Metro cuadrado (m²)</option>
-                                <option value="ha"  {{ 'selected' if elemento and elemento.unidad_medida=='ha' }}>Hectárea (ha)</option>
+                                <option value="m"  {{ 'selected' if u_sel=='m' }}>Metro (m)</option>
+                                <option value="m2" {{ 'selected' if u_sel=='m2' }}>Metro cuadrado (m²)</option>
+                                <option value="ha" {{ 'selected' if u_sel=='ha' }}>Hectárea (ha)</option>
                             </optgroup>
-                            <option value="otro" {{ 'selected' if elemento and elemento.unidad_medida not in ['kg','g','lb','t','arroba','L','mL','gal','unidad','bulto','saco','caja','paquete','rollo','m','m2','ha'] }}>Otro...</option>
+                            <option value="otro" {{ 'selected' if u_sel == 'otro' or (u_sel and u_sel not in unidades_lista) }}>
+                                Otro…
+                            </option>
                         </select>
 
-                        <!-- Campo libre si elige "Otro" -->
-                        <input type="text" id="unidadPersonalizada" name="unidad_personalizada"
-                            class="form-control mt-2 d-none"
-                            placeholder="Escribe la unidad personalizada...">
+                        <!-- Campo personalizado con autocompletado -->
+                        <input type="text" id="unidadPersonalizada" name="unidad_personalizada" class="dash-input" placeholder="Escribe la unidad personalizada…" value="{{ fd.get('unidad_personalizada', '') if fd else (elemento.unidad_medida if elemento and elemento.unidad_medida not in unidades_lista else '') }}" list="sugerenciasUnidad" autocomplete="off">
+                        <datalist id="sugerenciasUnidad">
+                            <option value="Quintal">
+                            <option value="Fanega">
+                            <option value="Cuartilla">
+                            <option value="Almud">
+                            <option value="Carga">
+                            <option value="Arrume">
+                            <option value="Canasta">
+                            <option value="Costal">
+                            <option value="Atado">
+                            <option value="Manojo">
+                            <option value="Racimo">
+                            <option value="Docena">
+                            <option value="Par">
+                            <option value="Dosis">
+                            <option value="Mata">
+                            <option value="Planta">
+                            <option value="Surco">
+                            <option value="Jornal">
+                            <option value="Tarea">
+                            <option value="Granel">
+                            <option value="Porción">
+                        </datalist>
+                        <div class="cat-hint" id="unidadError" style="color:#c62828;"></div>
                     </div>
 
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-success">
-                            <i class="bi bi-check-lg"></i>
-                            {{ 'Guardar cambios' if elemento else 'Registrar elemento' }}
-                        </button>
-                    </div>
+                    <!-- Submit -->
+                    <button type="submit" class="btn-submit">
+                        <i class="bi bi-check-lg"></i>
+                        {{ 'Guardar cambios' if elemento else 'Registrar elemento' }}
+                    </button>
 
                 </form>
             </div>
@@ -109,17 +367,137 @@
 
 {% block scripts %}
 <script>
-// Mostrar campo personalizado si elige "Otro"
-document.getElementById('selectUnidad').addEventListener('change', function() {
+// Descripciones de categoría → hint informativo
+const catInfo = {
+    insumo:      { label: 'Insumo',      icon: 'bi-droplet-fill',  cls: 'cat-insumo',      hint: 'Materiales consumibles usados en el proceso productivo (café, fertilizantes, etc.)' },
+    maquinaria:  { label: 'Maquinaria',  icon: 'bi-gear-fill',     cls: 'cat-maquinaria',  hint: 'Equipos y máquinas de alto valor (despulpadora, motobomba, etc.)' },
+    herramienta: { label: 'Herramienta', icon: 'bi-tools',         cls: 'cat-herramienta', hint: 'Implementos de trabajo manual (machete, azadón, tijeras de poda, etc.)' },
+    material:    { label: 'Material',    icon: 'bi-layers-fill',   cls: 'cat-material',    hint: 'Materiales de apoyo o empaque (costales, bolsas, etiquetas, etc.)' },
+};
+
+// Selecciona categoría vía pills → actualiza hidden input, estado visual y preview
+function seleccionarCategoria(val) {
+    document.getElementById('categoriaHidden').value = val;
+
+    document.querySelectorAll('.cat-pill').forEach(function(pill) {
+        const radio = pill.querySelector('input[type=radio]');
+        pill.className = 'cat-pill';
+        if (radio.value === val) {
+            radio.checked = true;
+            pill.classList.add('selected-' + val);
+        }
+    });
+
+    const preview = document.getElementById('catPreview');
+    const hint    = document.getElementById('catHint');
+    const info    = catInfo[val];
+    if (info) {
+        preview.className = 'cat-preview ' + info.cls;
+        preview.innerHTML = `<i class="bi ${info.icon}"></i> ${info.label}`;
+        preview.getBoundingClientRect();
+        preview.classList.add('visible');
+        hint.textContent = info.hint;
+        hint.classList.add('visible');
+    }
+}
+
+function verificarOtro(sel) {
     const campo = document.getElementById('unidadPersonalizada');
-    if (this.value === 'otro') {
-        campo.classList.remove('d-none');
+    if (sel.value === 'otro') {
+        campo.classList.add('visible-smooth');
         campo.required = true;
+        setTimeout(function() { campo.focus(); }, 320);
     } else {
-        campo.classList.add('d-none');
+        campo.classList.remove('visible-smooth');
         campo.required = false;
         campo.value = '';
+        document.getElementById('unidadError').textContent = '';
+    }
+}
+
+// ── Validación: el texto debe contener al menos una letra ──────────────────
+function tieneLetra(str) {
+    return /[A-Za-záéíóúÁÉÍÓÚñÑüÜ]/.test(str);
+}
+
+// Nombre: validar al escribir
+document.getElementById('inputNombre').addEventListener('input', function() {
+    const err = document.getElementById('nombreError');
+    if (this.value && !tieneLetra(this.value)) {
+        err.textContent = 'El nombre debe contener al menos una letra.';
+        err.classList.add('visible');
+    } else {
+        err.textContent = '';
+        err.classList.remove('visible');
     }
 });
+
+// Unidad personalizada: validar al escribir
+document.getElementById('unidadPersonalizada').addEventListener('input', function() {
+    const err = document.getElementById('unidadError');
+    if (this.value && !tieneLetra(this.value)) {
+        err.textContent = 'La unidad debe contener al menos una letra.';
+        err.classList.add('visible');
+    } else {
+        err.textContent = '';
+        err.classList.remove('visible');
+    }
+});
+
+// Stock: limpiar el 0 al enfocar, restaurar si se deja vacío
+document.querySelectorAll('.stock-input').forEach(inp => {
+    inp.addEventListener('focus', function() {
+        if (this.value === '0' || this.value === '0.00') this.value = '';
+    });
+    inp.addEventListener('blur', function() {
+        if (this.value === '') this.value = '0';
+    });
+});
+
+// Validación global antes de enviar el formulario
+document.getElementById('formElemento').addEventListener('submit', function(e) {
+    const nombre    = document.getElementById('inputNombre').value.trim();
+    const categoria = document.getElementById('categoriaHidden').value;
+    const unidad    = document.getElementById('unidadPersonalizada');
+
+    if (!tieneLetra(nombre)) {
+        e.preventDefault();
+        const err = document.getElementById('nombreError');
+        err.textContent = 'El nombre debe contener al menos una letra.';
+        err.classList.add('visible');
+        document.getElementById('inputNombre').focus();
+        return;
+    }
+
+    if (!categoria) {
+        e.preventDefault();
+        const hint = document.getElementById('catHint');
+        hint.textContent = 'Debes seleccionar una categoría.';
+        hint.style.color = '#c62828';
+        hint.classList.add('visible');
+        document.getElementById('catPills').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+    }
+
+    if (!unidad.classList.contains('d-none') && unidad.value && !tieneLetra(unidad.value)) {
+        e.preventDefault();
+        const err = document.getElementById('unidadError');
+        err.textContent = 'La unidad debe contener al menos una letra.';
+        err.classList.add('visible');
+        unidad.focus();
+    }
+});
+
+// Inicializar preview/pill si hay categoría preseleccionada (modo edición)
+const catInicial = document.getElementById('categoriaHidden').value;
+if (catInicial) seleccionarCategoria(catInicial);
+
+// Inicializar campo personalizado si la unidad no está en la lista (modo edición)
+const selUnidad = document.getElementById('selectUnidad');
+if (selUnidad.value === 'otro') {
+    const campo = document.getElementById('unidadPersonalizada');
+    campo.classList.add('visible-smooth');
+    campo.required = true;
+}
 </script>
 {% endblock %}

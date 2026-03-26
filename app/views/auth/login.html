@@ -1,3 +1,6 @@
+<!-- login.html — Pantalla de inicio de sesión. No extiende base.html (no hay navbar).
+     El formulario hace submit por AJAX (fetch + JSON) para respuesta sin recarga.
+     La validación del servidor está en auth_controller.py línea 16. -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -196,6 +199,107 @@
         .alert-warning { background: #fff8e1; color: #7a5800; }
         .alert-success { background: #e8f5e9; color: #1b5e20; }
 
+        /* ── Animaciones de entrada ── */
+        @keyframes slideLeft {
+            from { opacity: 0; transform: translateX(-28px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes slideRight {
+            from { opacity: 0; transform: translateX(28px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .panel-branding { animation: slideLeft 0.45s ease forwards; }
+        .panel-form      { animation: slideRight 0.45s ease forwards; }
+
+        /* ── Float del ícono principal ── */
+        @keyframes floatIcon {
+            0%, 100% { transform: translateY(0px); }
+            50%       { transform: translateY(-7px); }
+        }
+        .brand-title .bi-cup-hot-fill,
+        .brand-title > i { animation: floatIcon 3.2s ease-in-out infinite; display: inline-block; }
+
+        /* ── Stagger de feature items ── */
+        .feature-item { opacity: 0; animation: fadeUp 0.38s ease forwards; }
+        .feature-item:nth-child(1) { animation-delay: 0.30s; }
+        .feature-item:nth-child(2) { animation-delay: 0.45s; }
+        .feature-item:nth-child(3) { animation-delay: 0.60s; }
+
+        /* ── Badge pulse ── */
+        @keyframes badgePulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(165,214,167,0.35); }
+            50%       { box-shadow: 0 0 0 7px rgba(165,214,167,0); }
+        }
+        .brand-badge { animation: badgePulse 2.8s ease-in-out infinite; }
+
+        /* ── Glow en inputs al focus ── */
+        .input-wrapper:focus-within .input-icon { color: #2e7d32; transition: color 0.2s; }
+        .form-control:focus { box-shadow: 0 0 0 3px rgba(46,125,50,0.16), 0 0 10px rgba(46,125,50,0.08); }
+
+        /* ── Shimmer en botón ingresar ── */
+        .btn-ingresar { position: relative; overflow: hidden; }
+        .btn-ingresar::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 55%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent);
+            transform: skewX(-18deg);
+            animation: shimmer 2.8s ease-in-out infinite;
+        }
+        @keyframes shimmer {
+            0%       { left: -100%; }
+            55%, 100% { left: 160%; }
+        }
+
+        /* ── Shake en error ── */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60%  { transform: translateX(-6px); }
+            40%, 80%  { transform: translateX(6px); }
+        }
+        .input-shake { animation: shake 0.38s ease; }
+
+        /* ── Alerta inline de error ── */
+        .login-error {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-radius: 10px;
+            font-size: 0.88rem;
+            padding: 11px 14px;
+            margin-bottom: 20px;
+            opacity: 0;
+            max-height: 0;
+            overflow: hidden;
+            transition: opacity 0.35s ease, max-height 0.35s ease, margin-bottom 0.35s ease, padding 0.35s ease;
+            pointer-events: none;
+        }
+        .login-error.visible {
+            opacity: 1;
+            max-height: 80px;
+            pointer-events: auto;
+            animation: errorEntrar 0.35s cubic-bezier(0.34, 1.2, 0.64, 1) forwards;
+        }
+        .login-error.danger  { background: #fdecea; color: #b71c1c; }
+        .login-error.warning { background: #fff8e1; color: #7a5800; }
+        @keyframes errorEntrar {
+            from { opacity: 0; transform: translateY(-8px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── Alerta de error fade-in (flash fallback) ── */
+        .alert { animation: fadeUp 0.3s ease forwards; }
+
+        /* ── Form header stagger ── */
+        .form-header h2 { opacity: 0; animation: fadeUp 0.35s ease 0.15s forwards; }
+        .form-header p  { opacity: 0; animation: fadeUp 0.35s ease 0.25s forwards; }
+
         /* Responsive */
         @media (max-width: 768px) {
             body { flex-direction: column; }
@@ -282,14 +386,20 @@
             {% endfor %}
         {% endwith %}
 
-        <form method="POST">
+        <!-- Error inline (AJAX) -->
+        <div class="login-error" id="loginError" role="alert">
+            <i class="bi bi-exclamation-circle-fill" style="flex-shrink:0;"></i>
+            <span id="loginErrorMsg"></span>
+        </div>
+
+        <form method="POST" id="loginForm">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
             <div class="mb-3">
                 <label class="form-label">Correo electrónico</label>
                 <div class="input-wrapper">
                     <i class="bi bi-envelope input-icon"></i>
-                    <input type="email" name="email" class="form-control"
+                    <input type="email" name="email" id="inputEmail" class="form-control"
                            placeholder="usuario@ejemplo.com" required autofocus>
                 </div>
             </div>
@@ -298,12 +408,12 @@
                 <label class="form-label">Contraseña</label>
                 <div class="input-wrapper">
                     <i class="bi bi-lock input-icon"></i>
-                    <input type="password" name="password" class="form-control"
+                    <input type="password" name="password" id="inputPassword" class="form-control"
                            placeholder="••••••••" required>
                 </div>
             </div>
 
-            <button type="submit" class="btn btn-ingresar w-100">
+            <button type="submit" class="btn btn-ingresar w-100" id="btnIngresar">
                 <i class="bi bi-box-arrow-in-right me-2"></i>Ingresar al sistema
             </button>
         </form>
@@ -315,5 +425,80 @@
     </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const form     = document.getElementById('loginForm');
+const btnLogin = document.getElementById('btnIngresar');
+const errBox   = document.getElementById('loginError');
+const errMsg   = document.getElementById('loginErrorMsg');
+
+function mostrarError(mensaje, categoria) {
+    // Ocultar primero si ya estaba visible (para reiniciar animación)
+    errBox.classList.remove('visible', 'danger', 'warning');
+    errBox.offsetWidth; // forzar reflow
+
+    errMsg.textContent = mensaje;
+    errBox.classList.add(categoria, 'visible');
+
+    // Shake en los inputs
+    [document.getElementById('inputEmail'), document.getElementById('inputPassword')].forEach(function(inp) {
+        inp.classList.add('input-shake');
+        inp.addEventListener('animationend', function() { inp.classList.remove('input-shake'); }, { once: true });
+        // Borde rojo momentáneo
+        inp.style.borderColor = '#c62828';
+        inp.style.boxShadow   = '0 0 0 3px rgba(198,40,40,0.12)';
+        setTimeout(function() {
+            inp.style.borderColor = '';
+            inp.style.boxShadow   = '';
+        }, 2200);
+    });
+}
+
+form.addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    // Estado de carga
+    btnLogin.disabled = true;
+    btnLogin.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Verificando…';
+
+    try {
+        const res  = await fetch(form.action || window.location.href, {
+            method:  'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body:    new FormData(form)
+        });
+        const data = await res.json();
+
+        if (data.ok) {
+            // Redirigir sin parpadeo
+            window.location.href = data.redirect;
+            return;
+        }
+
+        mostrarError(data.mensaje, data.categoria);
+
+    } catch (err) {
+        mostrarError('Error de conexión. Intenta nuevamente.', 'danger');
+    }
+
+    // Restaurar botón
+    btnLogin.disabled = false;
+    btnLogin.innerHTML = '<i class="bi bi-box-arrow-in-right me-2"></i>Ingresar al sistema';
+});
+
+/* Ocultar error al comenzar a escribir */
+[document.getElementById('inputEmail'), document.getElementById('inputPassword')].forEach(function(inp) {
+    inp.addEventListener('input', function() {
+        errBox.classList.remove('visible');
+    });
+});
+
+/* Shake fallback: si la página cargó con flash de error (sin JS previo) */
+if (document.querySelector('.alert-danger, .alert-warning')) {
+    document.querySelectorAll('.form-control').forEach(function(inp) {
+        inp.classList.add('input-shake');
+        inp.addEventListener('animationend', function() { inp.classList.remove('input-shake'); }, { once: true });
+    });
+}
+</script>
 </body>
 </html>
